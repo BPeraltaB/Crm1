@@ -1,4 +1,11 @@
+# Artefactos de compilación
 bin/
 obj/
+
+# Archivos locales de Visual Studio
 *.user
-node_modules/
+*.suo
+.vs/
+
+# Datos locales de la aplicación
+Crm1.WindowsForms/Data/
