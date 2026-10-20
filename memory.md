@@ -13,7 +13,6 @@
 - No hay ventas registradas todavía.
 
 ## Pendiente de revisar
-- specs/000-fundamentos.md quedó desactualizada tras el borrado: describe el módulo Clientes como implementado. Actualizar su estado (marcar como pendiente) cuando se retome el desarrollo.
 - Siguientes módulos según specs/000-fundamentos.md (sección 8): contactos, oportunidades, tareas, recordatorios, presupuestos, pedidos, servicios, ventas, historial, búsqueda global, formatos TXT/binario y SQL.
 
 ## Decisiones
@@ -21,6 +20,7 @@
 - 20/10/2026: el usuario decidió volver al esqueleto vacío: se borraron Forms/, Models/, Services/ y el proyecto Crm1.Tests. El commit b2ac189 contiene todo ese código como copia de seguridad recuperable.
 - 20/10/2026: se conservan los documentos .md (docs/, specs/, agents.md, constitution.md, memory.md), .gitignore, Crm1.sln y el proyecto WinForms vacío con Program.cs mínimo.
 - 20/10/2026: el desarrollo futuro partirá de los documentos .md existentes; no crear formularios ni escribir código sin que el usuario lo pida y exista especificación activa.
+- 20/10/2026: specs/000-fundamentos.md marcada como "pendiente de implementar" (diseño activo, sin código) para cumplir el punto 2 de la constitución.
 
 ## Errores que se deben evitar
 - No escribir código ni formularios sin petición expresa del usuario y especificación activa que lo ampare.

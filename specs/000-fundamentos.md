@@ -1,6 +1,6 @@
 # Especificación 000: Fundamentos y módulo Clientes
 
-**Estado:** Activa (sustituye a la documentación previa de `docs/` como referencia de implementación; los documentos de `docs/` quedan como diseño general con módulos pendientes).
+**Estado:** Activa como diseño, **pendiente de implementar** (el esqueleto del proyecto está vacío; nada de lo descrito aquí existe aún en código). Sustituye a la documentación previa de `docs/` como referencia de implementación; los documentos de `docs/` quedan como diseño general con módulos pendientes.
 
 ## 1. Alcance
 
