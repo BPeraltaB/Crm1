@@ -8,7 +8,7 @@ static class Program
     [STAThread]
     static void Main()
     {
-        // Proyecto vacío a propósito: los formularios se crearán según las especificaciones activas.
         ApplicationConfiguration.Initialize();
+        Application.Run(new Forms.MainForm());
     }
 }

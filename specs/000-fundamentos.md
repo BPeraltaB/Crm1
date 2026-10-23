@@ -1,6 +1,6 @@
 # Especificación 000: Fundamentos y módulo Clientes
 
-**Estado:** Activa como diseño, **pendiente de implementar** (el esqueleto del proyecto está vacío; nada de lo descrito aquí existe aún en código). Sustituye a la documentación previa de `docs/` como referencia de implementación; los documentos de `docs/` quedan como diseño general con módulos pendientes.
+**Estado:** Activa como diseño, **pendiente de implementar** (solo existe el formulario principal `MainForm`; el resto descrito aquí no existe aún en código). Sustituye a la documentación previa de `docs/` como referencia de implementación; los documentos de `docs/` quedan como diseño general con módulos pendientes.
 
 ## 1. Alcance
 
@@ -12,6 +12,15 @@ Primera versión funcional de CRM1 centrada en el módulo de Clientes: alta, edi
   - `Crm1.WindowsForms`: aplicación WinForms (.NET 8) con carpetas `Models/`, `Services/` y `Forms/`.
   - `Crm1.Tests`: proyecto de pruebas xUnit que referencia al principal.
 - Compilación y pruebas mediante Visual Studio 2022 o `dotnet build` / `dotnet test`.
+
+## 2.1 Formulario principal
+
+- La aplicación inicia con el formulario principal `MainForm` (clase parcial `Crm1.WindowsForms.Forms.MainForm`), dividido en `Crm1.WindowsForms/Forms/MainForm.cs` y `Forms/MainForm.Designer.cs` para poder editarlo con el diseñador de Visual Studio. La clase no se llama `Form` a propósito: colisiona con `System.Windows.Forms.Form` y el diseñador de VS no la cargaría.
+- Diseño: ventana de 1200×750 (mínimo 900×600), título "CRM1", centrada en pantalla.
+  - Menú lateral (`MenuStrip` vertical, 220 px, tema oscuro #2D3748 con renderer propio) con: título "CRM1", Clientes, Búsqueda, Futuros clientes y Salir. Salir cierra la aplicación; el resto de items no abre nada todavía.
+  - Área central clara (#F3F4F6) vacía, reservada para el contenido de los módulos futuros.
+  - Barra de estado inferior blanca con "CRM1 — v0.1" y fecha/hora actualizada cada 30 segundos.
+- "Futuros clientes" es un módulo nuevo pendiente de especificación. El resto de módulos del diseño general (contactos, oportunidades, tareas, etc.) se ubicarán en otro formulario en el futuro, no en este menú.
 
 ## 3. Modelo de datos: Client
 
