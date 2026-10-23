@@ -25,6 +25,7 @@ Los datos se guardarán inicialmente en archivos locales. Se podrán utilizar lo
 - Antes de modificar código, leer `docs/constitution.md` y la especificación activa en `specs/`. Si alguno de esos documentos no existe o no está claro cuál es la especificación activa, solicitar aclaración antes de tocar el código.
 - No añadir dependencias ni cambiar los formatos de almacenamiento (JSON, TXT, binario o SQL) sin actualizar primero la especificación correspondiente.
 - No modificar archivos de ningún tipo salvo que el usuario lo solicite explícitamente.
+- Siempre comprobar todos los formularios creados y que no se modifique ninguno sin que el usuario lo solicite.
 
 ## 5. Memoria
 
