@@ -92,6 +92,7 @@ partial class MainForm
         this.clientsMenuItem.Size = new System.Drawing.Size(212, 40);
         this.clientsMenuItem.Text = "Clientes";
         this.clientsMenuItem.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.clientsMenuItem.Click += new System.EventHandler(this.ClientsMenuItem_Click);
         // 
         // searchMenuItem
         // 
@@ -102,6 +103,7 @@ partial class MainForm
         this.searchMenuItem.Size = new System.Drawing.Size(212, 40);
         this.searchMenuItem.Text = "Búsqueda";
         this.searchMenuItem.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.searchMenuItem.Click += new System.EventHandler(this.SearchMenuItem_Click);
         // 
         // prospectsMenuItem
         // 
@@ -112,6 +114,7 @@ partial class MainForm
         this.prospectsMenuItem.Size = new System.Drawing.Size(212, 40);
         this.prospectsMenuItem.Text = "Futuros clientes";
         this.prospectsMenuItem.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.prospectsMenuItem.Click += new System.EventHandler(this.ProspectsMenuItem_Click);
         // 
         // bottomSeparator
         // 
