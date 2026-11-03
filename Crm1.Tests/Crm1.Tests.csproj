@@ -21,4 +21,10 @@
     <ProjectReference Include="..\Crm1.WindowsForms\Crm1.WindowsForms.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Catálogo de códigos postales en la salida de pruebas: los formularios
+         reales lo cargan desde AppContext.BaseDirectory/Data. -->
+    <None Include="..\Crm1.WindowsForms\Data\postal-codes-es.json" Link="Data\postal-codes-es.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
