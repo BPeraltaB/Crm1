@@ -357,6 +357,11 @@ public partial class ContactForm : System.Windows.Forms.Form
         ContactStatus? status = SelectedStatusFilter();
         string text = searchTextBox.Text;
 
+        // Se recuerda el futuro cliente actual porque al soltar la celda o la
+        // selección el evento SelectionChanged limpia la marca; se restaura al
+        // final si su fila sigue visible.
+        Guid? currentId = _currentContactId;
+
         int visibleCount = 0;
         int totalCount = 0;
         foreach (System.Windows.Forms.DataGridViewRow row in contactsDataGridView.Rows)
@@ -370,6 +375,15 @@ public partial class ContactForm : System.Windows.Forms.Form
 
             totalCount++;
             bool matches = ContactService.MatchesFilter(MapRowToContact(row, out _), text, status);
+
+            // La celda actual se suelta antes de ocultar su fila: el control no
+            // permite ocultar la fila que la contiene.
+            if (!matches && contactsDataGridView.CurrentCell?.OwningRow == row)
+            {
+                contactsDataGridView.CurrentCell = null;
+                contactsDataGridView.ClearSelection();
+            }
+
             row.Visible = matches;
             if (matches)
             {
@@ -379,13 +393,27 @@ public partial class ContactForm : System.Windows.Forms.Form
 
         counterLabel.Text = $"Mostrando {visibleCount} de {totalCount}";
 
-        // Si el futuro cliente actual queda oculto por el filtro, la marca se
-        // retira (volverá a marcarse con un clic cuando vuelva a verse).
-        System.Windows.Forms.DataGridViewRow? currentRow = FindRowById(_currentContactId);
-        if (currentRow is { Visible: false })
+        // Si el futuro cliente actual quedó oculto por el filtro, la marca se
+        // retira (volverá a marcarse con un clic cuando vuelva a verse); si
+        // sigue visible, conserva la selección.
+        System.Windows.Forms.DataGridViewRow? currentRow = FindRowById(currentId);
+        if (currentRow is null || !currentRow.Visible)
         {
             contactsDataGridView.ClearSelection();
             _currentContactId = null;
+        }
+        else
+        {
+            _currentContactId = currentId;
+            _restoringSelection = true;
+            try
+            {
+                currentRow.Selected = true;
+            }
+            finally
+            {
+                _restoringSelection = false;
+            }
         }
     }
 
@@ -1201,8 +1229,12 @@ public partial class ContactForm : System.Windows.Forms.Form
             : null;
 
         // Durante la edición las demás filas están deshabilitadas: la selección
-        // (clic o teclado) se devuelve a la fila en edición.
-        if (_activeRow is not null && !_restoringSelection && selected != _activeRow)
+        // (clic o teclado) se devuelve a la fila en edición. Si esa fila ya se
+        // retiró de la tabla (Cancelar sobre una fila nueva), no se toca: sus
+        // celdas dejaron de pertenecer al control y reasignar la celda actual
+        // lanzaría «La celda proporcionada no pertenece a este control».
+        if (_activeRow is not null && _activeRow.Index >= 0
+            && !_restoringSelection && selected != _activeRow)
         {
             _restoringSelection = true;
             try
