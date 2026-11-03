@@ -26,6 +26,9 @@ Formulario del módulo de futuros clientes: personas o empresas en seguimiento a
 | `deleteButton`    | Eliminar  | Implementado (sección 6) |
 | `saveButton`      | Guardar   | Implementado (sección 6) |
 | `cancelButton`    | Cancelar  | Implementado (sección 6) |
+| `convertButton`   | Convertir en cliente | Implementado (sección 6) |
+
+- Barra de filtro (`filterPanel`, 40 px, fondo #F3F4F6) bajo la botonera: cuadro de texto `searchTextBox` con **búsqueda en vivo** (coincidencia parcial, sin mayúsculas ni tildes, en las 13 columnas; la fecha vacía no se busca), desplegable `statusFilterComboBox` (Todos / Pendiente / Descartado) y contador `counterLabel` "Mostrando X de Y". Bloqueada durante la edición, igual que la botonera; si el futuro cliente actual queda oculto, la marca se retira. Implementado.
 
 - `Id` no se muestra; viaja en `Tag` de cada fila. Todas las filas están en **solo lectura** salvo la fila activa para edición (sección 6). Selección por fila completa, **columnas con ancho automático al contenido** (`AllCells`) y **barra de desplazamiento horizontal** cuando el conjunto no cabe. Las celdas se ven **siempre blancas** (`SelectionBackColor` blanco): la fila seleccionada se marca con un **borde grueso (3 px, gris pizarra) alrededor de toda la fila**, nunca con un tinte azul.
 
@@ -57,16 +60,23 @@ Modelo `Contact` con los mismos campos que `Client` (specs/000), con `Status` de
 - **Carga al abrir**: catálogo de CPs, documentos de clientes guardados y `Data/contacts.json` (archivo inexistente = tabla vacía).
 - **Nuevo**: inserta una fila como primera fila con Estado = Pendiente, la activa para edición y entra en la celda Nombre.
 - **Modificar**: activa las celdas de la **fila seleccionada** para reescribir las que se quiera (si no hay selección, aviso). Solo hay **una fila en edición a la vez**, rastreada por referencia a la fila.
-- **Cancelar**: descarta la edición en curso — una fila nueva se elimina y una modificada vuelve a los valores de la instantánea tomada al activarla — y recalcula si quedan otros cambios pendientes comparando con la última copia guardada.
+- **Cancelar**: descarta la edición en curso — una fila nueva se elimina y una modificada vuelve a los valores de la instantánea tomada al activarla — y recalcula si quedan otros cambios pendientes comparando con la última copia guardada. Sin edición abierta, Cancelar **deshace las conversiones pendientes** (tercera capa de seguridad): pide confirmación y devuelve los futuros clientes a la tabla.
+- **Conversión en cliente** (specs/003, sección 7): `convertButton` actúa sobre el futuro cliente actual (aviso si no hay selección; inactivo durante edición o error de carga) con **doble confirmación**:
+  1. **Validación completa con las reglas de clientes** (`ContactService.ConvertToClient`): documento válido, apellidos según tipo de documento, móvil 6/7, correo, dirección, CP/ciudad/provincia coherentes y fecha de alta. Si falta algo, se muestra la lista de carencias ("Teléfono: los clientes exigen un móvil que empiece por 6 o 7.") y **no se convierte**.
+  2. **Primera confirmación** con el resumen de los datos del alta (nombre, documento, teléfono, correo, ciudad y fecha).
+  3. **Segunda confirmación** advirtiendo de que al guardar desaparecerá de Futuros clientes.
+  4. Tras los dos «Sí», la conversión queda **en memoria** (la fila se retira de la tabla). Al pulsar **Guardar** se escribe primero el alta en `clients.json` (conservando los clientes existentes) y solo si funciona se guarda `contacts.json` sin el convertido; un fallo no toca nada y se muestra (constitución, punto 5). El cliente nace **Activo** con identificador nuevo. `ClientForm` lo mostrará al volver al módulo de Clientes (recarga de specs/002).
 - **Eliminar** (skill «borrar»): pide confirmación Sí/No **solo con el nombre** («¿Seguro que quieres eliminar a Juan García López?») y quita la fila de la tabla. La eliminación es **en memoria**: se hace permanente al pulsar Guardar; salir sin guardar deja el archivo intacto. Actúa sobre el futuro cliente actual (aviso si no hay selección), está inactivo durante la edición y, si la fila eliminada era la marcada, la marca se limpia.
 - **Futuro cliente actual (skill «seleccionar-cliente»)**: un clic en cualquier celda de una fila (o el teclado) la marca como futuro cliente actual, rastreado **por identificador** (nunca por índice) y expuesto como `CurrentContact`/`CurrentContactId` para acciones futuras. Sin selección no hay futuro cliente actual; la fila marcada se ve rodeada por un **borde grueso** (la marca visual del patrón, también en la fila en edición); si la fila marcada desaparece, la marca se limpia; tras Guardar, la marca se mantiene sobre el mismo identificador. **Modificar actúa sobre el futuro cliente actual** (aviso si no hay ninguno marcado).
 - **Navegación desde la búsqueda global (specs/004)**: `IsEditing` expone si hay una edición en curso y `SelectContactById(Guid)` marca como futuro cliente actual el indicado y desplaza la tabla hasta su fila; los usa `MainForm` al elegir un resultado de búsqueda. Con edición en curso o registro ausente, la búsqueda avisa y no navega.
 - **Filas deshabilitadas durante la edición**: mientras hay una fila activa, las demás se ven atenuadas en gris y no se pueden seleccionar (ni con clic ni con teclado: la selección y la celda actual vuelven a la fila en edición); se rehabilitan al guardar con éxito o al cancelar.
 - **Estados de la botonera**: sin edición → Nuevo/Modificar/Eliminar/Guardar activos y Cancelar inactivo; en edición → Nuevo/Modificar/Eliminar inactivos y Cancelar activo; error de carga (catálogo o JSON) → todo inactivo. La ordenación por cabeceras se bloquea durante la edición.
+- **Búsqueda y filtro del listado**: la barra `filterPanel` filtra en vivo las filas de la tabla con `ContactService.MatchesFilter` (mismas reglas de coincidencia que la búsqueda global); el contador muestra cuántas filas se ven de cuántas hay y las acciones actúan solo sobre lo visible.
+- **Conversión en cliente** (`convertButton`, sección 7): sobre el futuro cliente actual, con validación completa y doble confirmación; la baja de Futuros clientes y el alta en Clientes se hacen al pulsar Guardar.
 - **Guardar**:
   1. Confirma la celda en edición (`EndEdit`).
   2. Ignora las filas totalmente vacías (el Estado Pendiente de la fila nueva no cuenta como dato).
-  3. Normaliza lo escrito (recortes, documento en mayúsculas y sin espacios, teléfono sin espacios, Estado vacío → Pendiente) y lo refleja en las celdas.
+  3. Normaliza lo escrito —recortes, documento en mayúsculas y sin espacios, teléfono sin espacios, Estado vacío → Pendiente y **mayúsculas según las normas de la lengua**: inicial mayúscula en cada palabra de nombre, apellidos, dirección y ciudad (partículas como "de" o "la" en minúscula si no abren el texto y siglas SA/SL conservadas) y observaciones solo con la primera letra— y lo refleja en las celdas.
   4. Valida todas las filas con `ContactService` (reglas 1-8 de la sección 4).
   5. Si hay errores: **no se guarda nada**; cada celda con error recibe un borde rojo (dibujado con `CellPainting`) y el MessageBox muestra una línea por error con el mensaje corto. El borde desaparece al corregir la celda.
   6. Si todo es correcto: asigna `Id` nuevo a las filas no guardadas y escribe `Data/contacts.json` de forma atómica; confirma el número de registros. Tras un guardado con éxito, todas las filas vuelven a solo lectura, las filas vacías se retiran de la vista y la edición se cierra; con errores, la edición sigue abierta (solo se cierra con un guardado correcto o con Cancelar).
@@ -94,8 +104,7 @@ Modelo `Contact` con los mismos campos que `Client` (specs/000), con `Status` de
 
 ## 7. Pendiente
 
-- Búsqueda y filtro del listado.
-- Conversión de futuro cliente en cliente (cuando el documento pase a `clients.json`, la regla 6 obliga a retirarlo de futuros clientes).
+- Nada pendiente del módulo de Futuros clientes.
 
 ## 8. Fuera de alcance
 
@@ -104,5 +113,6 @@ Modelo `Contact` con los mismos campos que `Client` (specs/000), con `Status` de
 
 ## 9. Pruebas (xUnit, `Crm1.Tests`)
 
-- `ContactServiceTests`: contacto mínimo válido (nombre + teléfono), contacto completo, nombre obligatorio, teléfono o correo, teléfono fijo/móvil/inválido, documento opcional y válido, CP/ciudad/provincia condicionales, documento repetido y documento de cliente.
+- `ContactServiceTests`: contacto mínimo válido (nombre + teléfono), contacto completo, nombre obligatorio, teléfono o correo, teléfono fijo/móvil/inválido, documento opcional y válido, CP/ciudad/provincia condicionales, documento repetido y documento de cliente; filtro del listado (texto sin tildes, estado, fecha vacía que no se busca) y conversión a cliente (éxito, fijo en vez de móvil, sin documento, sin fecha, sin ubicación, apellidos según documento y empresa con CIF).
 - `JsonDataStoreTests`: contacts.json guardar/recargar (campos vacíos conservados), archivo inexistente → lista vacía, archivo dañado → error, **independencia entre contacts.json y clients.json**, sin .tmp residual.
+- `TextNormalizerTests`: corrección de mayúsculas (partículas, siglas SA/SL, tildes, espacios de más y observaciones con la primera letra).

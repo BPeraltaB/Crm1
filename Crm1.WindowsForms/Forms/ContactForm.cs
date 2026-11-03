@@ -58,6 +58,14 @@ public partial class ContactForm : System.Windows.Forms.Form
     // Verdadero cuando hay cambios sin guardar.
     private bool _dirty;
 
+    // Conversiones a cliente pendientes de guardar (specs/003, sección 7):
+    // clientes listos para dar de alta en clients.json al pulsar Guardar.
+    private readonly List<Client> _pendingConversions = new();
+
+    // Futuros clientes convertidos en memoria: permiten deshacer con Cancelar
+    // devolviéndolos a la tabla mientras no se guarde.
+    private readonly List<Contact> _convertedContacts = new();
+
     /// <summary>
     /// Verdadero cuando la tabla tiene cambios sin guardar. Lo consulta MainForm
     /// antes de cerrar la aplicación porque ContactForm va embebido (specs/003).
@@ -187,7 +195,8 @@ public partial class ContactForm : System.Windows.Forms.Form
 
     /// <summary>
     /// Actualiza los botones según el estado (normal o edición) y si se pueden
-    /// validar y guardar datos. Eliminar está pendiente: visible pero inactivo.
+    /// validar y guardar datos. Convertir y el filtro quedan bloqueados durante
+    /// la edición, como el resto de la botonera.
     /// </summary>
     private void UpdateButtonStates()
     {
@@ -198,6 +207,11 @@ public partial class ContactForm : System.Windows.Forms.Form
         modifyButton.Enabled = _canSave && !editing;
         saveButton.Enabled = _canSave;
         cancelButton.Enabled = _canSave && editing;
+        convertButton.Enabled = _canSave && !editing;
+
+        // La barra de filtro también queda bloqueada mientras hay edición.
+        searchTextBox.Enabled = _canSave && !editing;
+        statusFilterComboBox.Enabled = _canSave && !editing;
     }
 
     /// <summary>
@@ -261,6 +275,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
         SetColumnsSortable(true);
         UpdateButtonStates();
+        ApplyFilter();
     }
 
     /// <summary>
@@ -314,12 +329,85 @@ public partial class ContactForm : System.Windows.Forms.Form
         _loading = false;
         _savedContacts = contacts;
         _dirty = false;
+        _pendingConversions.Clear();
+        _convertedContacts.Clear();
 
         // Sin futuro cliente actual hasta que el usuario marque una fila con un
         // clic (skill «seleccionar-cliente»).
         _currentContactId = null;
         contactsDataGridView.ClearSelection();
+
+        // Aplica el filtro vigente y actualiza el contador del listado.
+        ApplyFilter();
     }
+
+    /// <summary>
+    /// Aplica el filtro del listado (specs/003): quedan visibles las filas que
+    /// cumplen el texto buscado (parcial, sin mayúsculas ni tildes, en todas
+    /// las columnas) y el estado del desplegable; el contador muestra cuántas
+    /// se ven de cuántas hay.
+    /// </summary>
+    private void ApplyFilter()
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        ContactStatus? status = SelectedStatusFilter();
+        string text = searchTextBox.Text;
+
+        int visibleCount = 0;
+        int totalCount = 0;
+        foreach (System.Windows.Forms.DataGridViewRow row in contactsDataGridView.Rows)
+        {
+            // Las filas vacías (solo posibles con edición abierta) se dejan ver.
+            if (IsEmptyRow(row))
+            {
+                row.Visible = true;
+                continue;
+            }
+
+            totalCount++;
+            bool matches = ContactService.MatchesFilter(MapRowToContact(row, out _), text, status);
+            row.Visible = matches;
+            if (matches)
+            {
+                visibleCount++;
+            }
+        }
+
+        counterLabel.Text = $"Mostrando {visibleCount} de {totalCount}";
+
+        // Si el futuro cliente actual queda oculto por el filtro, la marca se
+        // retira (volverá a marcarse con un clic cuando vuelva a verse).
+        System.Windows.Forms.DataGridViewRow? currentRow = FindRowById(_currentContactId);
+        if (currentRow is { Visible: false })
+        {
+            contactsDataGridView.ClearSelection();
+            _currentContactId = null;
+        }
+    }
+
+    /// <summary>
+    /// Estado seleccionado en el desplegable del filtro; null = Todos.
+    /// </summary>
+    private ContactStatus? SelectedStatusFilter() => statusFilterComboBox.SelectedIndex switch
+    {
+        1 => ContactStatus.Pending,
+        2 => ContactStatus.Discarded,
+        _ => null
+    };
+
+    /// <summary>
+    /// Vuelve a aplicar el filtro al cambiar el texto buscado (búsqueda en vivo).
+    /// </summary>
+    private void SearchTextBox_TextChanged(object? sender, EventArgs e) => ApplyFilter();
+
+    /// <summary>
+    /// Vuelve a aplicar el filtro al cambiar el estado del desplegable.
+    /// </summary>
+    private void StatusFilterComboBox_SelectedIndexChanged(object? sender, EventArgs e) => ApplyFilter();
 
     /// <summary>
     /// Añade a la tabla una fila con los datos de un futuro cliente guardado.
@@ -473,13 +561,138 @@ public partial class ContactForm : System.Windows.Forms.Form
     }
 
     /// <summary>
+    /// Convierte en cliente el futuro cliente actual (specs/003, sección 7):
+    /// valida que cumpla todas las reglas de los clientes, pide doble
+    /// confirmación y deja la conversión en memoria hasta pulsar Guardar.
+    /// </summary>
+    private void ConvertButton_Click(object? sender, EventArgs e)
+    {
+        if (!_canSave || _activeRow is not null)
+        {
+            return;
+        }
+
+        // Futuro cliente actual marcado con un clic (skill «seleccionar-cliente»).
+        System.Windows.Forms.DataGridViewRow? row = FindRowById(_currentContactId);
+        if (row is null)
+        {
+            MessageBox.Show(this,
+                "Selecciona un futuro cliente de la tabla.",
+                "CRM1 — Convertir en cliente",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        // Normaliza antes de validar, igual que al guardar.
+        NormalizeRowCells(row);
+        Contact contact = MapRowToContact(row, out _);
+        string displayName = RowDisplayName(row);
+
+        ConversionResult result = _contactService!.ConvertToClient(contact);
+        if (!result.Success)
+        {
+            MessageBox.Show(this,
+                $"{displayName} no puede convertirse en cliente todavía:\n\n" +
+                string.Join("\n", result.Errors) +
+                "\n\nCompleta sus datos en Futuros clientes y vuelve a intentarlo.",
+                "CRM1 — Convertir en cliente",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        // Doble seguridad (specs/003): primera confirmación con el resumen.
+        DialogResult first = MessageBox.Show(this,
+            $"Vas a convertir a {displayName} en cliente con estos datos:\n\n" +
+            ClientSummary(result.Client!) + "\n\n¿Continuar?",
+            "CRM1 — Convertir en cliente",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (first != DialogResult.Yes)
+        {
+            return;
+        }
+
+        // Segunda confirmación: advierte de lo que ocurrirá al guardar.
+        DialogResult second = MessageBox.Show(this,
+            $"Al guardar, {displayName} se dará de alta en Clientes y desaparecerá de Futuros clientes.\n\n" +
+            "Hasta entonces puedes deshacerlo con Cancelar o saliendo sin guardar.\n\n" +
+            "¿Confirmas la conversión?",
+            "CRM1 — Confirmar conversión",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+        if (second != DialogResult.Yes)
+        {
+            return;
+        }
+
+        // Conversión en memoria: la fila se retira de la tabla y el alta se
+        // escribe en clients.json al pulsar Guardar, nunca antes.
+        _pendingConversions.Add(result.Client!);
+        _convertedContacts.Add(contact);
+        contactsDataGridView.Rows.Remove(row);
+        EnsureCurrentContactExists();
+        _dirty = true;
+        ApplyFilter();
+    }
+
+    /// <summary>
+    /// Resumen de los datos con los que se dará de alta un cliente convertido.
+    /// </summary>
+    private static string ClientSummary(Client client)
+    {
+        string name = string.Join(" ",
+            new[] { client.FirstName, client.LastName1, client.LastName2 }.Where(part => part.Length > 0));
+
+        var lines = new List<string> { $"Nombre: {name}", $"Documento: {client.TaxId}" };
+        if (client.Phone.Length > 0)
+        {
+            lines.Add($"Teléfono: {client.Phone}");
+        }
+        if (client.Email.Length > 0)
+        {
+            lines.Add($"Correo: {client.Email}");
+        }
+        if (client.City.Length > 0)
+        {
+            lines.Add($"Ciudad: {client.City} ({client.Province})");
+        }
+        lines.Add($"Fecha de alta: {client.RegistrationDate:dd/MM/yyyy}");
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>
     /// Descarta la edición en curso: una fila nueva se elimina de la tabla y una
     /// modificada vuelve a los valores de la instantánea tomada al activarla.
     /// </summary>
     private void CancelButton_Click(object? sender, EventArgs e)
     {
+        // Sin edición abierta, Cancelar deshace las conversiones pendientes
+        // (tercera capa de seguridad de specs/003, sección 7).
         if (_activeRow is null)
         {
+            if (_pendingConversions.Count == 0)
+            {
+                return;
+            }
+
+            DialogResult undo = MessageBox.Show(this,
+                $"Hay {_pendingConversions.Count} conversión(es) a cliente pendientes de guardar.\n\n" +
+                "¿Cancelarlas y devolver los futuros clientes a la tabla?",
+                "CRM1 — Cancelar conversiones",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (undo != DialogResult.Yes)
+            {
+                return;
+            }
+
+            foreach (Contact contact in _convertedContacts)
+            {
+                AddContactRow(contact);
+            }
+
+            _pendingConversions.Clear();
+            _convertedContacts.Clear();
+            _dirty = GridDiffersFromSaved();
+            EnsureCurrentContactExists();
+            ApplyFilter();
             return;
         }
 
@@ -582,6 +795,28 @@ public partial class ContactForm : System.Windows.Forms.Form
             contactsDataGridView.Rows[rowIndexes[i]].Tag = contacts[i].Id;
         }
 
+        // Conversiones a cliente (specs/003, sección 7): primero se escribe el
+        // alta en clients.json y solo si funciona se guarda contacts.json sin
+        // los convertidos; un fallo no toca nada y se muestra (constitución, 5).
+        if (_pendingConversions.Count > 0)
+        {
+            try
+            {
+                List<Client> clientsOnDisk = _dataStore.LoadClients();
+                clientsOnDisk.AddRange(_pendingConversions);
+                _dataStore.SaveClients(clientsOnDisk);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this,
+                    "No se han podido dar de alta los clientes convertidos; no se ha guardado nada.\n\n" +
+                    ex.Message,
+                    "CRM1 — Error al guardar",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+        }
+
         try
         {
             _dataStore.SaveContacts(contacts);
@@ -599,6 +834,10 @@ public partial class ContactForm : System.Windows.Forms.Form
         _savedContacts = contacts;
         _dirty = false;
 
+        int convertedCount = _pendingConversions.Count;
+        _pendingConversions.Clear();
+        _convertedContacts.Clear();
+
         // El futuro cliente actual pasa a ser el de la fila editada, ya con su
         // identificador asignado (skill «seleccionar-cliente», regla 4).
         if (_activeRow is not null && _activeRow.Tag is Guid savedId)
@@ -612,7 +851,9 @@ public partial class ContactForm : System.Windows.Forms.Form
         EnsureCurrentContactExists();
 
         MessageBox.Show(this,
-            $"Se han guardado {contacts.Count} futuro(s) cliente(s) correctamente.",
+            convertedCount > 0
+                ? $"Se han guardado {contacts.Count} futuro(s) cliente(s) y se ha(n) dado de alta {convertedCount} cliente(s) correctamente."
+                : $"Se han guardado {contacts.Count} futuro(s) cliente(s) correctamente.",
             "CRM1 — Guardar",
             MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
@@ -751,8 +992,10 @@ public partial class ContactForm : System.Windows.Forms.Form
     }
 
     /// <summary>
-    /// Recorta los valores de la fila, normaliza documento y teléfono y deja el
-    /// estado vacío como Pendiente, escribiendo el resultado en las propias celdas.
+    /// Recorta los valores de la fila, normaliza documento y teléfono, corrige
+    /// las mayúsculas según las normas de la lengua (inicial de cada palabra,
+    /// partículas en minúscula; observaciones solo la primera letra) y deja el
+    /// estado vacío como Pendiente, escribiendo el resultado en las celdas.
     /// </summary>
     private static void NormalizeRowCells(System.Windows.Forms.DataGridViewRow row)
     {
@@ -772,6 +1015,15 @@ public partial class ContactForm : System.Windows.Forms.Form
         {
             row.Cells["statusColumn"].Value = DefaultStatusText;
         }
+
+        // Corrección de mayúsculas (specs/003): si el usuario no pone la
+        // inicial mayúscula, el programa la corrige al guardar.
+        row.Cells["firstNameColumn"].Value = TextNormalizer.CapitalizeWords(CellText(row, "firstNameColumn"));
+        row.Cells["lastName1Column"].Value = TextNormalizer.CapitalizeWords(CellText(row, "lastName1Column"));
+        row.Cells["lastName2Column"].Value = TextNormalizer.CapitalizeWords(CellText(row, "lastName2Column"));
+        row.Cells["addressColumn"].Value = TextNormalizer.CapitalizeWords(CellText(row, "addressColumn"));
+        row.Cells["cityColumn"].Value = TextNormalizer.CapitalizeWords(CellText(row, "cityColumn"));
+        row.Cells["notesColumn"].Value = TextNormalizer.CapitalizeSentence(CellText(row, "notesColumn"));
     }
 
     /// <summary>

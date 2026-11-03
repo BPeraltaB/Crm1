@@ -53,6 +53,16 @@ public partial class ClientForm : System.Windows.Forms.Form
     // Verdadero cuando hay cambios sin guardar.
     private bool _dirty;
 
+    // Ruta y sello temporal del archivo de clientes: detecta cambios hechos
+    // desde fuera (p. ej. conversiones de futuros clientes) para recargar o
+    // fusionar al guardar sin perder esos registros (constitución, punto 5).
+    private readonly string _clientsFilePath = Path.Combine(AppContext.BaseDirectory, "Data", "clients.json");
+    private DateTime _lastClientsFileStamp;
+
+    // Clientes guardados en disco que esta tabla no muestra (añadidos desde
+    // fuera mientras el formulario estaba abierto): se conservan al guardar.
+    private List<Client> _externalClients = new();
+
     /// <summary>
     /// Verdadero cuando la tabla tiene cambios sin guardar. Lo consulta MainForm
     /// antes de cerrar la aplicación porque ClientForm va embebido (specs/002).
@@ -159,7 +169,8 @@ public partial class ClientForm : System.Windows.Forms.Form
 
     /// <summary>
     /// Actualiza los botones según el estado (normal o edición) y si se pueden
-    /// validar y guardar datos. Eliminar está pendiente: visible pero inactivo.
+    /// validar y guardar datos. El filtro de la tabla se bloquea durante la
+    /// edición, igual que la botonera.
     /// </summary>
     private void UpdateButtonStates()
     {
@@ -171,6 +182,10 @@ public partial class ClientForm : System.Windows.Forms.Form
         modifyButton.Enabled = _canSave && !editing;
         saveButton.Enabled = _canSave;
         cancelButton.Enabled = _canSave && editing;
+
+        // La barra de filtro también queda bloqueada mientras hay edición.
+        searchTextBox.Enabled = _canSave && !editing;
+        statusFilterComboBox.Enabled = _canSave && !editing;
     }
 
     /// <summary>
@@ -234,6 +249,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         }
         SetColumnsSortable(true);
         UpdateButtonStates();
+        ApplyFilter();
     }
 
     /// <summary>
@@ -286,12 +302,109 @@ public partial class ClientForm : System.Windows.Forms.Form
         _loading = false;
         _savedClients = clients;
         _dirty = false;
+        _lastClientsFileStamp = GetClientsFileStamp();
+        _externalClients.Clear();
 
         // Sin cliente actual hasta que el usuario marque una fila con un clic
         // (skill «seleccionar-cliente»).
         _currentClientId = null;
         clientsDataGridView.ClearSelection();
+
+        // Aplica el filtro vigente y actualiza el contador del listado.
+        ApplyFilter();
     }
+
+    /// <summary>
+    /// Sello temporal del archivo de clientes: cambia cuando alguien más lo
+    /// escribe (por ejemplo, una conversión desde Futuros clientes).
+    /// </summary>
+    private DateTime GetClientsFileStamp() =>
+        File.Exists(_clientsFilePath) ? File.GetLastWriteTimeUtc(_clientsFilePath) : DateTime.MinValue;
+
+    /// <summary>
+    /// Al volver a mostrar el módulo, recarga los clientes si el archivo cambió
+    /// en disco y aquí no hay nada pendiente; así aparecen las altas hechas
+    /// desde fuera (conversiones) sin tocar MainForm (specs/002).
+    /// </summary>
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+
+        if (Visible && _canSave && !_dirty && _activeRow is null
+            && GetClientsFileStamp() != _lastClientsFileStamp)
+        {
+            clientsDataGridView.Rows.Clear();
+            LoadClients();
+        }
+    }
+
+    /// <summary>
+    /// Aplica el filtro del listado (specs/002): quedan visibles las filas que
+    /// cumplen el texto buscado (parcial, sin mayúsculas ni tildes, en todas
+    /// las columnas) y el estado del desplegable; el contador muestra cuántas
+    /// se ven de cuántas hay.
+    /// </summary>
+    private void ApplyFilter()
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        ClientStatus? status = SelectedStatusFilter();
+        string text = searchTextBox.Text;
+
+        int visibleCount = 0;
+        int totalCount = 0;
+        foreach (System.Windows.Forms.DataGridViewRow row in clientsDataGridView.Rows)
+        {
+            // Las filas vacías (solo posibles con edición abierta) se dejan ver.
+            if (IsEmptyRow(row))
+            {
+                row.Visible = true;
+                continue;
+            }
+
+            totalCount++;
+            bool matches = ClientService.MatchesFilter(MapRowToClient(row, out _), text, status);
+            row.Visible = matches;
+            if (matches)
+            {
+                visibleCount++;
+            }
+        }
+
+        counterLabel.Text = $"Mostrando {visibleCount} de {totalCount}";
+
+        // Si el cliente actual queda oculto por el filtro, la marca se retira
+        // (volverá a marcarse con un clic cuando vuelva a verse).
+        System.Windows.Forms.DataGridViewRow? currentRow = FindRowById(_currentClientId);
+        if (currentRow is { Visible: false })
+        {
+            clientsDataGridView.ClearSelection();
+            _currentClientId = null;
+        }
+    }
+
+    /// <summary>
+    /// Estado seleccionado en el desplegable del filtro; null = Todos.
+    /// </summary>
+    private ClientStatus? SelectedStatusFilter() => statusFilterComboBox.SelectedIndex switch
+    {
+        1 => ClientStatus.Active,
+        2 => ClientStatus.Inactive,
+        _ => null
+    };
+
+    /// <summary>
+    /// Vuelve a aplicar el filtro al cambiar el texto buscado (búsqueda en vivo).
+    /// </summary>
+    private void SearchTextBox_TextChanged(object? sender, EventArgs e) => ApplyFilter();
+
+    /// <summary>
+    /// Vuelve a aplicar el filtro al cambiar el estado del desplegable.
+    /// </summary>
+    private void StatusFilterComboBox_SelectedIndexChanged(object? sender, EventArgs e) => ApplyFilter();
 
     /// <summary>
     /// Añade a la tabla una fila con los datos de un cliente guardado.
@@ -542,9 +655,36 @@ public partial class ClientForm : System.Windows.Forms.Form
             clientsDataGridView.Rows[rowIndexes[i]].Tag = clients[i].Id;
         }
 
+        // Si el archivo cambió en disco desde la última carga (p. ej. una
+        // conversión desde Futuros clientes), esos registros se conservan y la
+        // tabla se aplica sobre ellos: nunca se pierden al guardar.
+        List<Client> clientsToSave = clients;
+        if (GetClientsFileStamp() != _lastClientsFileStamp)
+        {
+            try
+            {
+                List<Client> onDisk = _dataStore.LoadClients();
+                var knownIds = _savedClients.Select(c => c.Id).ToHashSet();
+                var tableIds = clients.Select(c => c.Id).ToHashSet();
+                _externalClients = onDisk
+                    .Where(c => !knownIds.Contains(c.Id) && !tableIds.Contains(c.Id))
+                    .ToList();
+                clientsToSave = _externalClients.Concat(clients).ToList();
+            }
+            catch (Exception ex)
+            {
+                // Sin poder leer el archivo no se puede fusionar: no se guarda.
+                MessageBox.Show(this,
+                    "No se pudo comprobar el archivo de clientes antes de guardar.\n\n" + ex.Message,
+                    "CRM1 — Error al guardar",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+        }
+
         try
         {
-            _dataStore.SaveClients(clients);
+            _dataStore.SaveClients(clientsToSave);
         }
         catch (Exception ex)
         {
@@ -558,6 +698,7 @@ public partial class ClientForm : System.Windows.Forms.Form
 
         _savedClients = clients;
         _dirty = false;
+        _lastClientsFileStamp = GetClientsFileStamp();
 
         // El cliente actual pasa a ser el de la fila editada, ya con su
         // identificador asignado (skill «seleccionar-cliente», regla 4).
@@ -718,8 +859,10 @@ public partial class ClientForm : System.Windows.Forms.Form
     }
 
     /// <summary>
-    /// Recorta los valores de la fila y normaliza documento y teléfono, escribiendo
-    /// el resultado en las propias celdas.
+    /// Recorta los valores de la fila, normaliza documento y teléfono y corrige
+    /// las mayúsculas según las normas de la lengua (inicial de cada palabra,
+    /// partículas en minúscula; observaciones solo la primera letra),
+    /// escribiendo el resultado en las propias celdas.
     /// </summary>
     private static void NormalizeRowCells(System.Windows.Forms.DataGridViewRow row)
     {
@@ -733,6 +876,15 @@ public partial class ClientForm : System.Windows.Forms.Form
 
         row.Cells["taxIdColumn"].Value = SpanishDocuments.Normalize(CellText(row, "taxIdColumn"));
         row.Cells["phoneColumn"].Value = ClientService.NormalizePhone(CellText(row, "phoneColumn"));
+
+        // Corrección de mayúsculas (specs/002): si el usuario no pone la
+        // inicial mayúscula, el programa la corrige al guardar.
+        row.Cells["firstNameColumn"].Value = TextNormalizer.CapitalizeWords(CellText(row, "firstNameColumn"));
+        row.Cells["lastName1Column"].Value = TextNormalizer.CapitalizeWords(CellText(row, "lastName1Column"));
+        row.Cells["lastName2Column"].Value = TextNormalizer.CapitalizeWords(CellText(row, "lastName2Column"));
+        row.Cells["addressColumn"].Value = TextNormalizer.CapitalizeWords(CellText(row, "addressColumn"));
+        row.Cells["cityColumn"].Value = TextNormalizer.CapitalizeWords(CellText(row, "cityColumn"));
+        row.Cells["notesColumn"].Value = TextNormalizer.CapitalizeSentence(CellText(row, "notesColumn"));
     }
 
     /// <summary>

@@ -16,7 +16,6 @@
 - No hay ventas registradas todavía.
 
 ## Pendiente de revisar
-- Filtro de ambos módulos (specs/002 sección 5 y specs/003 sección 7). Pendiente también la conversión de futuro cliente en cliente (specs/003 sección 7). La búsqueda global ya está implementada (specs/004).
 - Siguientes módulos según specs/000-fundamentos.md (sección 8): contactos, oportunidades, tareas, recordatorios, presupuestos, pedidos, servicios, ventas, historial, formatos TXT/binario y SQL.
 
 ## Decisiones
@@ -68,6 +67,7 @@
 - 03/11/2026: confirmado el trabajo de las sesiones paralelas en 5 commits por grupos (documentación specs 002-004; capa de negocio + 118 pruebas; interfaz de los tres módulos; skills; catálogo de CPs con `git add -f` porque `Data/` está ignorada). Baseline antes de confirmar: compilación 0 errores/0 advertencias y 118/118 pruebas en verde.
 - 03/11/2026: autorización de pruebas registrada como regla en agents.md (datos de prueba en Data/, ejecutar app y pruebas automatizadas, informar de errores).
 - 03/11/2026: generados 20 clientes + 20 futuros clientes de prueba (bin/Debug/.../Data): documentos con control válido calculado con los algoritmos del programa, tríos CP/ciudad/provincia reales del catálogo, clientes solo con móvil (6/7), contactos con 6/7/8/9, documentos de contactos sin chocar con clientes, fechas ISO y «0001-01-01T00:00:00» como sin fecha. Script generador con verificación integrada en %TEMP%\opencode\generar-datos-prueba.ps1 (regenerable).
+- 03/11/2026: módulos de Clientes y Futuros clientes completados: barra de filtro en ambos (búsqueda en vivo parcial, sin mayúsculas ni tildes, sobre las 13 columnas + desplegable de estado + contador «Mostrando X de Y»; bloqueada durante la edición; si el registro actual queda oculto se retira la marca); TextNormalizer corrige mayúsculas al guardar (inicial por palabra en nombre/apellidos/dirección/ciudad, partículas «de/la/…» en minúscula salvo inicial, siglas SA/SL intactas, observaciones solo la primera letra); conversión de futuro cliente a cliente (convertButton) con validación completa de reglas de clientes, doble confirmación (resumen + advertencia) y efectos solo al Guardar: primero alta en clients.json conservando existentes y luego contacts.json sin el convertido; Cancelar sin edición deshace las conversiones (tercera capa). ClientForm recarga al volverse a mostrar si cambió clients.json (sin cambios pendientes) y al guardar fusiona los registros añadidos desde fuera (_externalClients): las conversiones nunca se pierden. Pruebas: 157 en verde (+39: normalizador, filtros y conversión).
 
 ## Errores que se deben evitar
 - No escribir código ni formularios sin petición expresa del usuario y especificación activa que lo ampare.
