@@ -161,6 +161,48 @@ public sealed partial class ClientService
         return builder.ToString();
     }
 
+    /// <summary>
+    /// Indica si un cliente pasa el filtro del listado (specs/002): el texto
+    /// busca en las columnas visibles —coincidencia parcial, sin mayúsculas ni
+    /// tildes, como la búsqueda global— y el estado filta cuando se indica.
+    /// Un texto vacío con estado null deja pasar todo.
+    /// </summary>
+    public static bool MatchesFilter(Client client, string? text, ClientStatus? status)
+    {
+        if (status.HasValue && client.Status != status.Value)
+        {
+            return false;
+        }
+
+        string normalized = SearchService.NormalizeText(text ?? string.Empty);
+        if (normalized.Length == 0)
+        {
+            return true;
+        }
+
+        return SearchableValues(client).Any(value =>
+            value.Length > 0 && SearchService.NormalizeText(value).Contains(normalized, StringComparison.Ordinal));
+    }
+
+    // Valores visibles de un cliente en el orden de las columnas de la tabla
+    // (los mismos campos que la búsqueda global, specs/004).
+    private static IEnumerable<string> SearchableValues(Client client)
+    {
+        yield return client.FirstName;
+        yield return client.LastName1;
+        yield return client.LastName2;
+        yield return client.TaxId;
+        yield return client.Phone;
+        yield return client.Email;
+        yield return client.Address;
+        yield return client.PostalCode;
+        yield return client.City;
+        yield return client.Province;
+        yield return client.Status == ClientStatus.Inactive ? "Inactivo" : "Activo";
+        yield return client.RegistrationDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        yield return client.Notes;
+    }
+
     // Valida el código postal (5 dígitos, existente) y su correspondencia con la
     // ciudad y la provincia (reglas 4 y 5).
     private void ValidatePostalCodeAndLocation(Client client, List<ClientValidationError> errors)

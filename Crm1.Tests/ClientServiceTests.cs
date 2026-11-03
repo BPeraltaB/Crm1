@@ -221,4 +221,63 @@ public sealed class ClientServiceTests : IDisposable
     {
         Assert.Equal("+34612345678", ClientService.NormalizePhone(" +34 612-345-678 "));
     }
+
+    // Pruebas del filtro del listado (specs/002, búsqueda y filtro).
+
+    [Fact]
+    public void Filter_with_empty_text_and_no_status_returns_everything()
+    {
+        Assert.True(ClientService.MatchesFilter(ValidClient(), "   ", null));
+    }
+
+    [Fact]
+    public void Filter_matches_partial_name_ignoring_case()
+    {
+        Client client = ValidClient();
+        Assert.True(ClientService.MatchesFilter(client, "gar", null));
+        Assert.True(ClientService.MatchesFilter(client, "JUAN", null));
+    }
+
+    [Fact]
+    public void Filter_matches_without_tildes()
+    {
+        Client client = ValidClient(c => c.City = "València");
+        Assert.True(ClientService.MatchesFilter(client, "valencia", null));
+    }
+
+    [Fact]
+    public void Filter_matches_document_phone_and_date()
+    {
+        Client client = ValidClient();
+        Assert.True(ClientService.MatchesFilter(client, "12345678", null));
+        Assert.True(ClientService.MatchesFilter(client, "61234", null));
+        Assert.True(ClientService.MatchesFilter(client, "15/01/2026", null));
+    }
+
+    [Fact]
+    public void Filter_by_status_excludes_the_other_state()
+    {
+        Client active = ValidClient();
+        Client inactive = ValidClient(c => c.Status = ClientStatus.Inactive);
+
+        Assert.True(ClientService.MatchesFilter(active, null, ClientStatus.Active));
+        Assert.False(ClientService.MatchesFilter(inactive, null, ClientStatus.Active));
+        Assert.True(ClientService.MatchesFilter(inactive, null, ClientStatus.Inactive));
+    }
+
+    [Fact]
+    public void Filter_combines_text_and_status()
+    {
+        Client inactiveJuan = ValidClient(c => c.Status = ClientStatus.Inactive);
+        Client activeJuan = ValidClient();
+
+        Assert.False(ClientService.MatchesFilter(inactiveJuan, "juan", ClientStatus.Active));
+        Assert.True(ClientService.MatchesFilter(activeJuan, "juan", ClientStatus.Active));
+    }
+
+    [Fact]
+    public void Filter_rejects_when_no_field_contains_the_text()
+    {
+        Assert.False(ClientService.MatchesFilter(ValidClient(), "zgz", null));
+    }
 }

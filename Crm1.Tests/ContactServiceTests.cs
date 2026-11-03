@@ -229,4 +229,140 @@ public sealed class ContactServiceTests : IDisposable
         Assert.Contains("ya está registrado en clientes", error.Error.Message);
         Assert.Equal(0, error.RowIndex);
     }
+
+    // Pruebas del filtro del listado (specs/003, búsqueda y filtro).
+
+    [Fact]
+    public void Contact_filter_with_empty_text_and_no_status_returns_everything()
+    {
+        Assert.True(ContactService.MatchesFilter(ValidContact(), "  ", null));
+    }
+
+    [Fact]
+    public void Contact_filter_matches_without_accents()
+    {
+        Contact contact = ValidContact(c => c.LastName1 = "Fernández");
+        Assert.True(ContactService.MatchesFilter(contact, "fernandez", null));
+    }
+
+    [Fact]
+    public void Contact_filter_by_status_excludes_the_other_state()
+    {
+        Contact pending = ValidContact();
+        Contact discarded = ValidContact(c => c.Status = ContactStatus.Discarded);
+
+        Assert.True(ContactService.MatchesFilter(pending, null, ContactStatus.Pending));
+        Assert.False(ContactService.MatchesFilter(discarded, null, ContactStatus.Pending));
+        Assert.True(ContactService.MatchesFilter(discarded, null, ContactStatus.Discarded));
+    }
+
+    [Fact]
+    public void Contact_without_date_does_not_match_date_searches()
+    {
+        // La fecha vacía de un futuro cliente no se busca (igual que en la búsqueda global).
+        Assert.False(ContactService.MatchesFilter(ValidContact(), "15/01/2026", null));
+    }
+
+    // Pruebas de la conversión de futuro cliente en cliente (specs/003, sección 7).
+
+    // Futuro cliente que ya cumple todas las reglas de los clientes.
+    private static Contact ConvertibleContact(Action<Contact>? tweak = null)
+    {
+        var contact = new Contact
+        {
+            FirstName = "Lucía",
+            LastName1 = "Fernández",
+            LastName2 = "Ruiz",
+            TaxId = "12345678Z",
+            Address = "Calle Mayor 1",
+            PostalCode = "28001",
+            City = "Madrid",
+            Province = "Madrid",
+            Phone = "612345678",
+            Email = "lucia@example.com",
+            RegistrationDate = new DateTime(2026, 4, 5),
+            Notes = "Visto en una feria"
+        };
+        tweak?.Invoke(contact);
+        return contact;
+    }
+
+    [Fact]
+    public void Convert_complete_contact_succeeds_as_active_client()
+    {
+        ConversionResult result = _service.ConvertToClient(ConvertibleContact());
+
+        Assert.True(result.Success);
+        Assert.Equal("Lucía", result.Client!.FirstName);
+        Assert.Equal(ClientStatus.Active, result.Client.Status);
+        Assert.NotEqual(Guid.Empty, result.Client.Id);
+        Assert.Equal(new DateTime(2026, 4, 5), result.Client.RegistrationDate);
+    }
+
+    [Fact]
+    public void Convert_contact_with_landline_phone_fails()
+    {
+        // El fijo 912345678 vale para un futuro cliente, pero el cliente exige móvil.
+        ConversionResult result = _service.ConvertToClient(ConvertibleContact(c => c.Phone = "912345678"));
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.Contains("Teléfono") && e.Contains("6 o 7"));
+    }
+
+    [Fact]
+    public void Convert_contact_without_document_fails()
+    {
+        ConversionResult result = _service.ConvertToClient(ConvertibleContact(c => c.TaxId = ""));
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.StartsWith("Documento"));
+    }
+
+    [Fact]
+    public void Convert_contact_without_registration_date_fails()
+    {
+        ConversionResult result = _service.ConvertToClient(ConvertibleContact(c => c.RegistrationDate = default));
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.StartsWith("Fecha de alta"));
+    }
+
+    [Fact]
+    public void Convert_contact_without_location_fails()
+    {
+        ConversionResult result = _service.ConvertToClient(ConvertibleContact(c =>
+        {
+            c.Address = "";
+            c.PostalCode = "";
+            c.City = "";
+            c.Province = "";
+        }));
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.StartsWith("Dirección"));
+    }
+
+    [Fact]
+    public void Convert_contact_with_dni_and_missing_second_surname_fails()
+    {
+        ConversionResult result = _service.ConvertToClient(ConvertibleContact(c => c.LastName2 = ""));
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.StartsWith("Segundo apellido"));
+    }
+
+    [Fact]
+    public void Convert_company_contact_with_cif_and_empty_surnames_succeeds()
+    {
+        ConversionResult result = _service.ConvertToClient(ConvertibleContact(c =>
+        {
+            c.FirstName = "Frutas del Sur SL";
+            c.LastName1 = "";
+            c.LastName2 = "";
+            c.TaxId = "B56789019"; // CIF válido con dígito de control correcto.
+        }));
+
+        Assert.True(result.Success);
+        Assert.Equal("Frutas del Sur SL", result.Client!.FirstName);
+    }
 }

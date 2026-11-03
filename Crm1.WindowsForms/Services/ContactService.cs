@@ -22,6 +22,7 @@ public sealed partial class ContactService
 
     private readonly PostalCodeCatalog _catalog;
     private readonly HashSet<string> _clientDocuments;
+    private readonly ClientService _clientService;
 
     /// <summary>
     /// Crea el servicio con el catálogo de códigos postales y los documentos de
@@ -34,6 +35,7 @@ public sealed partial class ContactService
         _clientDocuments = new HashSet<string>(clientDocuments
             .Select(SpanishDocuments.Normalize)
             .Where(document => !string.IsNullOrWhiteSpace(document)));
+        _clientService = new ClientService(catalog);
     }
 
     /// <summary>
@@ -175,5 +177,116 @@ public sealed partial class ContactService
         {
             errors.Add(new() { Field = nameof(Contact.City), Message = "La ciudad no pertenece a la provincia." });
         }
+    }
+
+    /// <summary>
+    /// Indica si un futuro cliente pasa el filtro del listado (specs/003): el
+    /// texto busca en las columnas visibles —coincidencia parcial, sin
+    /// mayúsculas ni tildes, como la búsqueda global— y el estado filtra cuando
+    /// se indica. Un texto vacío con estado null deja pasar todo.
+    /// </summary>
+    public static bool MatchesFilter(Contact contact, string? text, ContactStatus? status)
+    {
+        if (status.HasValue && contact.Status != status.Value)
+        {
+            return false;
+        }
+
+        string normalized = SearchService.NormalizeText(text ?? string.Empty);
+        if (normalized.Length == 0)
+        {
+            return true;
+        }
+
+        return SearchableValues(contact).Any(value =>
+            value.Length > 0 && SearchService.NormalizeText(value).Contains(normalized, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Convierte un futuro cliente en cliente (specs/003, sección 7): copia los
+    /// datos, comprueba que cumplan TODAS las reglas de los clientes y devuelve
+    /// el cliente listo (estado Activo, identificador nuevo) o la lista de
+    /// carencias que impiden la conversión.
+    /// </summary>
+    public ConversionResult ConvertToClient(Contact contact)
+    {
+        // El cliente nace Activo y conserva la fecha del futuro cliente; sin
+        // fecha no puede darse de alta (regla de clientes) y quedará como carencia.
+        var candidate = new Client
+        {
+            Id = Guid.NewGuid(),
+            FirstName = contact.FirstName.Trim(),
+            LastName1 = contact.LastName1.Trim(),
+            LastName2 = contact.LastName2.Trim(),
+            TaxId = SpanishDocuments.Normalize(contact.TaxId),
+            Phone = ClientService.NormalizePhone(contact.Phone),
+            Email = contact.Email.Trim(),
+            Address = contact.Address.Trim(),
+            PostalCode = contact.PostalCode.Trim(),
+            City = contact.City.Trim(),
+            Province = contact.Province.Trim(),
+            Status = ClientStatus.Active,
+            RegistrationDate = contact.RegistrationDate,
+            Notes = contact.Notes.Trim()
+        };
+
+        // Validación completa con las reglas de los clientes.
+        var errors = new List<string>();
+        foreach (ClientValidationError error in _clientService.ValidateClient(candidate))
+        {
+            errors.Add($"{FieldLabel(error.Field)}: {ConversionHint(error)}");
+        }
+
+        return errors.Count > 0
+            ? new ConversionResult { Errors = errors }
+            : new ConversionResult { Client = candidate };
+    }
+
+    // Mensaje orientado a la conversión a partir del error de validación de clientes.
+    private static string ConversionHint(ClientValidationError error) => error.Field switch
+    {
+        nameof(Client.Phone) => "los clientes exigen un móvil que empiece por 6 o 7.",
+        nameof(Client.RegistrationDate) => "los clientes necesitan fecha de alta (dd/mm/aaaa).",
+        nameof(Client.LastName1) => "falta el primer apellido (obligatorio salvo empresas con CIF).",
+        nameof(Client.LastName2) => "falta el segundo apellido (obligatorio salvo CIF o NIE).",
+        _ => error.Message
+    };
+
+    // Nombre en español del campo, para la lista de carencias del diálogo.
+    private static string FieldLabel(string field) => field switch
+    {
+        nameof(Client.FirstName) => "Nombre",
+        nameof(Client.LastName1) => "Primer apellido",
+        nameof(Client.LastName2) => "Segundo apellido",
+        nameof(Client.TaxId) => "Documento",
+        nameof(Client.Phone) => "Teléfono",
+        nameof(Client.Email) => "Correo electrónico",
+        nameof(Client.Address) => "Dirección",
+        nameof(Client.PostalCode) => "Código postal",
+        nameof(Client.City) => "Ciudad",
+        nameof(Client.Province) => "Provincia",
+        nameof(Client.RegistrationDate) => "Fecha de alta",
+        _ => field
+    };
+
+    // Valores visibles de un futuro cliente en el orden de las columnas de la
+    // tabla; la fecha vacía no se busca (igual que la búsqueda global).
+    private static IEnumerable<string> SearchableValues(Contact contact)
+    {
+        yield return contact.FirstName;
+        yield return contact.LastName1;
+        yield return contact.LastName2;
+        yield return contact.TaxId;
+        yield return contact.Phone;
+        yield return contact.Email;
+        yield return contact.Address;
+        yield return contact.PostalCode;
+        yield return contact.City;
+        yield return contact.Province;
+        yield return contact.Status == ContactStatus.Discarded ? "Descartado" : "Pendiente";
+        yield return contact.RegistrationDate == default
+            ? string.Empty
+            : contact.RegistrationDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        yield return contact.Notes;
     }
 }

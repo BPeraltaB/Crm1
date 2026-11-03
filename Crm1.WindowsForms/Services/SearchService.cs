@@ -56,7 +56,7 @@ public static class SearchService
     public static IReadOnlyList<SearchMatch> Search(IEnumerable<Client> clients, IEnumerable<Contact> contacts, string? term)
     {
         var matches = new List<SearchMatch>();
-        string normalizedTerm = Normalize(term ?? string.Empty);
+        string normalizedTerm = NormalizeText(term ?? string.Empty);
         if (normalizedTerm.Length == 0)
         {
             return matches;
@@ -97,7 +97,7 @@ public static class SearchService
         var matched = new List<string>();
         foreach ((string label, string value) in fields)
         {
-            if (value.Length > 0 && Normalize(value).Contains(normalizedTerm, StringComparison.Ordinal))
+            if (value.Length > 0 && NormalizeText(value).Contains(normalizedTerm, StringComparison.Ordinal))
             {
                 matched.Add($"{label}: {value}");
             }
@@ -160,7 +160,8 @@ public static class SearchService
         string.Join(" ", new[] { firstName, lastName1, lastName2 }.Where(part => part.Length > 0));
 
     // Normaliza para comparar: recorte, minúsculas y sin tildes ("Málaga" = "malaga").
-    private static string Normalize(string text)
+    // Pública para que los filtros de los módulos comparen igual que la búsqueda.
+    public static string NormalizeText(string text)
     {
         string trimmed = text.Trim();
         if (trimmed.Length == 0)
