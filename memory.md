@@ -4,7 +4,10 @@
 - Fecha de actualización: 3 de noviembre de 2026
 
 ## Clientes
-- 0 clientes registrados.
+- 20 clientes de prueba cargados (17 activos, 3 inactivos) en `Data/clients.json` junto al ejecutable; no se suben a git.
+
+## Futuros clientes
+- 20 futuros clientes de prueba cargados (17 pendientes, 3 descartados) en `Data/contacts.json` junto al ejecutable; no se suben a git.
 
 ## Proyectos
 - No hay proyectos registrados todavía.
@@ -62,6 +65,9 @@
 - 29/10/2026: implementada la búsqueda global (specs/004 nueva): item Búsqueda → `SearchForm` embebido (cuadro de texto con búsqueda en vivo + tabla Módulo|Nombre|Coincidencia, selección estándar); `Services/SearchService` (coincidencia parcial Contains, sin mayúsculas ni tildes, 13 campos en orden de columnas, fecha dd/MM/aaaa — futuro cliente sin fecha no busca, un registro = una fila con campos agrupados, clientes antes que contactos); datos de disco leídos en cada búsqueda (cambios sin Guardar no aparecen); fallo de lectura = MessageBox y resultados vacíos (nunca éxito); navegación con doble clic o Enter vía evento NavigateRequested → MainForm muestra el módulo y marca la fila (nuevos `IsEditing` + `SelectClientById`/`SelectContactById` en ClientForm/ContactForm; avisos si edición en curso o registro ausente). Pruebas: +11 SearchServiceTests (117 en total). specs/000 (menú implementado, "búsqueda global" fuera de pendientes), 001 (SearchForm Creado specs/004, tres excepciones de menú), 002 y 003 (miembros de navegación) sincronizadas.
 - 29/10/2026: corregido SearchForm en blanco: faltaban los Controls.Add del panel y la tabla en el Designer (los controles existían pero no pertenecían al formulario).
 - 03/11/2026: la tabla de resultados de la búsqueda pasa a ser la misma que los módulos: columna Módulo + las 13 columnas de specs/002/003 (mismos nombres/cabeceras/orden), celdas siempre blancas y borde grueso 3 px #64748B en la fila seleccionada (RowPostPaint), sin columna Coincidencia ni resaltado de celdas (decisión del usuario: nada de negritas). `SearchMatch` expone el registro completo (`Client`/`Contact`) y conserva `MatchedText` interno; +1 prueba (118 en total). specs/004 sincronizada.
+- 03/11/2026: confirmado el trabajo de las sesiones paralelas en 5 commits por grupos (documentación specs 002-004; capa de negocio + 118 pruebas; interfaz de los tres módulos; skills; catálogo de CPs con `git add -f` porque `Data/` está ignorada). Baseline antes de confirmar: compilación 0 errores/0 advertencias y 118/118 pruebas en verde.
+- 03/11/2026: autorización de pruebas registrada como regla en agents.md (datos de prueba en Data/, ejecutar app y pruebas automatizadas, informar de errores).
+- 03/11/2026: generados 20 clientes + 20 futuros clientes de prueba (bin/Debug/.../Data): documentos con control válido calculado con los algoritmos del programa, tríos CP/ciudad/provincia reales del catálogo, clientes solo con móvil (6/7), contactos con 6/7/8/9, documentos de contactos sin chocar con clientes, fechas ISO y «0001-01-01T00:00:00» como sin fecha. Script generador con verificación integrada en %TEMP%\opencode\generar-datos-prueba.ps1 (regenerable).
 
 ## Errores que se deben evitar
 - No escribir código ni formularios sin petición expresa del usuario y especificación activa que lo ampare.
@@ -69,3 +75,5 @@
 - No usar identificadores en español en el código (el código va en inglés; solo comentarios e interfaz en español).
 - Cuidado con sesiones paralelas: verificar el estado real del disco y de git antes de tocar archivos.
 - No nombrar `Form` a una clase de formulario: el diseñador de Visual Studio no la carga (por eso el principal se llama `MainForm`).
+- Windows PowerShell 5.1 lee los `.ps1` sin BOM como ANSI y destroza tildes y eñes: guardar los scripts con caracteres españoles en UTF-8 **con BOM**.
+- Los datos de prueba van junto al ejecutable (`bin/Debug/net8.0-windows/Data/`), no en la carpeta `Data/` del código: la app lee con `AppContext.BaseDirectory`.

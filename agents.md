@@ -26,6 +26,7 @@ Los datos se guardarán inicialmente en archivos locales. Se podrán utilizar lo
 - No añadir dependencias ni cambiar los formatos de almacenamiento (JSON, TXT, binario o SQL) sin actualizar primero la especificación correspondiente.
 - No modificar archivos de ningún tipo salvo que el usuario lo solicite explícitamente.
 - Siempre comprobar todos los formularios creados y que no se modifique ninguno sin que el usuario lo solicite.
+- Se autoriza al agente a crear y modificar datos de prueba en `Data/`, a ejecutar la aplicación y las pruebas automatizadas para detectar errores, y a informar siempre de lo encontrado.
 
 ## 5. Memoria
 
