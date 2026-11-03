@@ -14,4 +14,10 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Las pruebas de interfaz instancian los formularios reales y necesitan
+         acceder a su costura interna de diálogos (Prompt). -->
+    <InternalsVisibleTo Include="Crm1.Tests" />
+  </ItemGroup>
+
 </Project>

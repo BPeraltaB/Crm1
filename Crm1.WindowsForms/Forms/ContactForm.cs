@@ -72,6 +72,14 @@ public partial class ContactForm : System.Windows.Forms.Form
     /// </summary>
     public bool HasUnsavedChanges => _dirty;
 
+    /// <summary>
+    /// Diálogos del formulario (avisos, confirmaciones y errores): todo pasa
+    /// por aquí. En la aplicación es un MessageBox con este formulario como
+    /// dueño; las pruebas automatizadas de interfaz lo sustituyen por un
+    /// delegado que responde sin bloquear.
+    /// </summary>
+    internal Func<string, string, MessageBoxButtons, MessageBoxIcon, DialogResult> Prompt { get; set; }
+
     // Futuro cliente actual marcado por el usuario (skill «seleccionar-cliente»):
     // rastreo por identificador, nunca por índice.
     private Guid? _currentContactId;
@@ -128,6 +136,11 @@ public partial class ContactForm : System.Windows.Forms.Form
     {
         InitializeComponent();
 
+        // En la aplicación los diálogos son MessageBox con este formulario
+        // como dueño (costura de pruebas: ver el comentario de la propiedad).
+        Prompt = (text, caption, buttons, icon) =>
+            MessageBox.Show(this, text, caption, buttons, icon);
+
         PostalCodeCatalog? catalog = null;
         try
         {
@@ -136,7 +149,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this,
+            Prompt(
                 "No se pudo cargar el archivo de códigos postales (Data/postal-codes-es.json).\n\n" +
                 "Los botones de gestión se han desactivado porque no se pueden validar los datos.\n\n" +
                 ex.Message,
@@ -159,7 +172,7 @@ public partial class ContactForm : System.Windows.Forms.Form
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this,
+                Prompt(
                     "No se pudo leer el archivo de clientes (Data/clients.json), necesario para\n" +
                     "comprobar que un documento de un cliente no se usa como futuro cliente.\n\n" +
                     "Los botones de gestión se han desactivado para no omitir la comprobación.\n\n" +
@@ -311,7 +324,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this,
+            Prompt(
                 "No se pudo leer el archivo de futuros clientes (Data/contacts.json).\n\n" +
                 "Los botones de gestión se han desactivado para no sobrescribir los datos.\n\n" +
                 ex.Message,
@@ -513,7 +526,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         System.Windows.Forms.DataGridViewRow? row = FindRowById(_currentContactId);
         if (row is null)
         {
-            MessageBox.Show(this,
+            Prompt(
                 "Selecciona un futuro cliente de la tabla.",
                 "CRM1 — Modificar",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -543,7 +556,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         System.Windows.Forms.DataGridViewRow? row = FindRowById(_currentContactId);
         if (row is null)
         {
-            MessageBox.Show(this,
+            Prompt(
                 "Selecciona un futuro cliente de la tabla.",
                 "CRM1 — Eliminar",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -551,7 +564,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
 
         // Confirmación antes de eliminar, identificando al futuro cliente por su nombre.
-        DialogResult result = MessageBox.Show(this,
+        DialogResult result = Prompt(
             $"¿Seguro que quieres eliminar a {RowDisplayName(row)}?\n\n" +
             "Se quitará de la tabla y se eliminará por completo del archivo al pulsar Guardar.",
             "CRM1 — Eliminar",
@@ -604,7 +617,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         System.Windows.Forms.DataGridViewRow? row = FindRowById(_currentContactId);
         if (row is null)
         {
-            MessageBox.Show(this,
+            Prompt(
                 "Selecciona un futuro cliente de la tabla.",
                 "CRM1 — Convertir en cliente",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -619,7 +632,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         ConversionResult result = _contactService!.ConvertToClient(contact);
         if (!result.Success)
         {
-            MessageBox.Show(this,
+            Prompt(
                 $"{displayName} no puede convertirse en cliente todavía:\n\n" +
                 string.Join("\n", result.Errors) +
                 "\n\nCompleta sus datos en Futuros clientes y vuelve a intentarlo.",
@@ -629,7 +642,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
 
         // Doble seguridad (specs/003): primera confirmación con el resumen.
-        DialogResult first = MessageBox.Show(this,
+        DialogResult first = Prompt(
             $"Vas a convertir a {displayName} en cliente con estos datos:\n\n" +
             ClientSummary(result.Client!) + "\n\n¿Continuar?",
             "CRM1 — Convertir en cliente",
@@ -640,7 +653,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
 
         // Segunda confirmación: advierte de lo que ocurrirá al guardar.
-        DialogResult second = MessageBox.Show(this,
+        DialogResult second = Prompt(
             $"Al guardar, {displayName} se dará de alta en Clientes y desaparecerá de Futuros clientes.\n\n" +
             "Hasta entonces puedes deshacerlo con Cancelar o saliendo sin guardar.\n\n" +
             "¿Confirmas la conversión?",
@@ -701,7 +714,7 @@ public partial class ContactForm : System.Windows.Forms.Form
                 return;
             }
 
-            DialogResult undo = MessageBox.Show(this,
+            DialogResult undo = Prompt(
                 $"Hay {_pendingConversions.Count} conversión(es) a cliente pendientes de guardar.\n\n" +
                 "¿Cancelarlas y devolver los futuros clientes a la tabla?",
                 "CRM1 — Cancelar conversiones",
@@ -836,7 +849,7 @@ public partial class ContactForm : System.Windows.Forms.Form
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this,
+                Prompt(
                     "No se han podido dar de alta los clientes convertidos; no se ha guardado nada.\n\n" +
                     ex.Message,
                     "CRM1 — Error al guardar",
@@ -852,7 +865,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         catch (Exception ex)
         {
             // Un fallo de escritura nunca se presenta como éxito (constitución, punto 5).
-            MessageBox.Show(this,
+            Prompt(
                 "No se han podido guardar los futuros clientes.\n\n" + ex.Message,
                 "CRM1 — Error al guardar",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -878,7 +891,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         EndEditingSession();
         EnsureCurrentContactExists();
 
-        MessageBox.Show(this,
+        Prompt(
             convertedCount > 0
                 ? $"Se han guardado {contacts.Count} futuro(s) cliente(s) y se ha(n) dado de alta {convertedCount} cliente(s) correctamente."
                 : $"Se han guardado {contacts.Count} futuro(s) cliente(s) correctamente.",
@@ -1105,7 +1118,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         contactsDataGridView.Invalidate();
 
         IEnumerable<string> messages = errors.Select(item => item.Error.Message);
-        MessageBox.Show(this,
+        Prompt(
             string.Join("\n", messages),
             "CRM1 — Errores de validación",
             MessageBoxButtons.OK, MessageBoxIcon.Warning);

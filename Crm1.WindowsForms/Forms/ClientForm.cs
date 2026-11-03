@@ -69,6 +69,14 @@ public partial class ClientForm : System.Windows.Forms.Form
     /// </summary>
     public bool HasUnsavedChanges => _dirty;
 
+    /// <summary>
+    /// Diálogos del formulario (avisos, confirmaciones y errores): todo pasa
+    /// por aquí. En la aplicación es un MessageBox con este formulario como
+    /// dueño; las pruebas automatizadas de interfaz lo sustituyen por un
+    /// delegado que responde sin bloquear.
+    /// </summary>
+    internal Func<string, string, MessageBoxButtons, MessageBoxIcon, DialogResult> Prompt { get; set; }
+
     // Cliente actual marcado por el usuario (skill «seleccionar-cliente»):
     // rastreo por identificador, nunca por índice.
     private Guid? _currentClientId;
@@ -124,6 +132,11 @@ public partial class ClientForm : System.Windows.Forms.Form
     {
         InitializeComponent();
 
+        // En la aplicación los diálogos son MessageBox con este formulario
+        // como dueño (costura de pruebas: ver el comentario de la propiedad).
+        Prompt = (text, caption, buttons, icon) =>
+            MessageBox.Show(this, text, caption, buttons, icon);
+
         PostalCodeCatalog? catalog = null;
         try
         {
@@ -132,7 +145,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this,
+            Prompt(
                 "No se pudo cargar el archivo de códigos postales (Data/postal-codes-es.json).\n\n" +
                 "Los botones de gestión se han desactivado porque no se pueden validar los datos.\n\n" +
                 ex.Message,
@@ -284,7 +297,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this,
+            Prompt(
                 "No se pudo leer el archivo de clientes (Data/clients.json).\n\n" +
                 "Los botones de gestión se han desactivado para no sobrescribir los datos.\n\n" +
                 ex.Message,
@@ -500,7 +513,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         System.Windows.Forms.DataGridViewRow? row = FindRowById(_currentClientId);
         if (row is null)
         {
-            MessageBox.Show(this,
+            Prompt(
                 "Selecciona un cliente de la tabla.",
                 "CRM1 — Modificar",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -530,7 +543,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         System.Windows.Forms.DataGridViewRow? row = FindRowById(_currentClientId);
         if (row is null)
         {
-            MessageBox.Show(this,
+            Prompt(
                 "Selecciona un cliente de la tabla.",
                 "CRM1 — Eliminar",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -538,7 +551,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         }
 
         // Confirmación antes de eliminar, identificando al cliente por su nombre.
-        DialogResult result = MessageBox.Show(this,
+        DialogResult result = Prompt(
             $"¿Seguro que quieres eliminar a {RowDisplayName(row)}?\n\n" +
             "Se quitará de la tabla y se eliminará por completo del archivo al pulsar Guardar.",
             "CRM1 — Eliminar",
@@ -702,7 +715,7 @@ public partial class ClientForm : System.Windows.Forms.Form
             catch (Exception ex)
             {
                 // Sin poder leer el archivo no se puede fusionar: no se guarda.
-                MessageBox.Show(this,
+                Prompt(
                     "No se pudo comprobar el archivo de clientes antes de guardar.\n\n" + ex.Message,
                     "CRM1 — Error al guardar",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -717,7 +730,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         catch (Exception ex)
         {
             // Un fallo de escritura nunca se presenta como éxito (constitución, punto 5).
-            MessageBox.Show(this,
+            Prompt(
                 "No se han podido guardar los clientes.\n\n" + ex.Message,
                 "CRM1 — Error al guardar",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -740,7 +753,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         EndEditingSession();
         EnsureCurrentClientExists();
 
-        MessageBox.Show(this,
+        Prompt(
             $"Se han guardado {clients.Count} cliente(s) correctamente.",
             "CRM1 — Guardar",
             MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -956,7 +969,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         clientsDataGridView.Invalidate();
 
         IEnumerable<string> messages = errors.Select(item => item.Error.Message);
-        MessageBox.Show(this,
+        Prompt(
             string.Join("\n", messages),
             "CRM1 — Errores de validación",
             MessageBoxButtons.OK, MessageBoxIcon.Warning);
