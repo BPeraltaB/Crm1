@@ -28,7 +28,7 @@ Formulario del módulo de futuros clientes: personas o empresas en seguimiento a
 | `cancelButton`    | Cancelar  | Implementado (sección 6) |
 | `convertButton`   | Convertir en cliente | Implementado (sección 6) |
 
-- Barra de filtro (`filterPanel`, 40 px, fondo #F3F4F6) bajo la botonera: cuadro de texto `searchTextBox` con **búsqueda en vivo** (coincidencia parcial, sin mayúsculas ni tildes, en las 13 columnas; la fecha vacía no se busca), desplegable `statusFilterComboBox` (Todos / Pendiente / Descartado) y contador `counterLabel` "Mostrando X de Y". Bloqueada durante la edición, igual que la botonera; si el futuro cliente actual queda oculto, la marca se retira. Implementado.
+- Barra de información (`filterPanel`, 40 px, fondo #F3F4F6) bajo la botonera con el contador `counterLabel` "Mostrando X de Y". Sin filtro local: **la búsqueda se realiza desde el formulario principal** (búsqueda global, specs/004).
 
 - `Id` no se muestra; viaja en `Tag` de cada fila. Todas las filas están en **solo lectura** salvo la fila activa para edición (sección 6). Selección por fila completa, **columnas con ancho automático al contenido** (`AllCells`) y **barra de desplazamiento horizontal** cuando el conjunto no cabe. Las celdas se ven **siempre blancas** (`SelectionBackColor` blanco): la fila seleccionada se marca con un **borde grueso (3 px, gris pizarra) alrededor de toda la fila**, nunca con un tinte azul.
 
@@ -71,7 +71,7 @@ Modelo `Contact` con los mismos campos que `Client` (specs/000), con `Status` de
 - **Navegación desde la búsqueda global (specs/004)**: `IsEditing` expone si hay una edición en curso y `SelectContactById(Guid)` marca como futuro cliente actual el indicado y desplaza la tabla hasta su fila; los usa `MainForm` al elegir un resultado de búsqueda. Con edición en curso o registro ausente, la búsqueda avisa y no navega.
 - **Filas deshabilitadas durante la edición**: mientras hay una fila activa, las demás se ven atenuadas en gris y no se pueden seleccionar (ni con clic ni con teclado: la selección y la celda actual vuelven a la fila en edición); se rehabilitan al guardar con éxito o al cancelar.
 - **Estados de la botonera**: sin edición → Nuevo/Modificar/Eliminar/Guardar activos y Cancelar inactivo; en edición → Nuevo/Modificar/Eliminar inactivos y Cancelar activo; error de carga (catálogo o JSON) → todo inactivo. La ordenación por cabeceras se bloquea durante la edición.
-- **Búsqueda y filtro del listado**: la barra `filterPanel` filtra en vivo las filas de la tabla con `ContactService.MatchesFilter` (mismas reglas de coincidencia que la búsqueda global); el contador muestra cuántas filas se ven de cuántas hay y las acciones actúan solo sobre lo visible.
+- **Contador del listado**: la barra bajo la botonera muestra cuántas filas con datos hay en la tabla ("Mostrando X de Y", siempre iguales al no haber filtro). Sin búsqueda ni filtro local: la búsqueda se hace desde el formulario principal (specs/004).
 - **Conversión en cliente** (`convertButton`, sección 7): sobre el futuro cliente actual, con validación completa y doble confirmación; la baja de Futuros clientes y el alta en Clientes se hacen al pulsar Guardar.
 - **Guardar**:
   1. Confirma la celda en edición (`EndEdit`).
@@ -113,6 +113,6 @@ Modelo `Contact` con los mismos campos que `Client` (specs/000), con `Status` de
 
 ## 9. Pruebas (xUnit, `Crm1.Tests`)
 
-- `ContactServiceTests`: contacto mínimo válido (nombre + teléfono), contacto completo, nombre obligatorio, teléfono o correo, teléfono fijo/móvil/inválido, documento opcional y válido, CP/ciudad/provincia condicionales, documento repetido y documento de cliente; filtro del listado (texto sin tildes, estado, fecha vacía que no se busca) y conversión a cliente (éxito, fijo en vez de móvil, sin documento, sin fecha, sin ubicación, apellidos según documento y empresa con CIF).
+- `ContactServiceTests`: contacto mínimo válido (nombre + teléfono), contacto completo, nombre obligatorio, teléfono o correo, teléfono fijo/móvil/inválido, documento opcional y válido, CP/ciudad/provincia condicionales, documento repetido y documento de cliente, y conversión a cliente (éxito, fijo en vez de móvil, sin documento, sin fecha, sin ubicación, apellidos según documento y empresa con CIF).
 - `JsonDataStoreTests`: contacts.json guardar/recargar (campos vacíos conservados), archivo inexistente → lista vacía, archivo dañado → error, **independencia entre contacts.json y clients.json**, sin .tmp residual.
 - `TextNormalizerTests`: corrección de mayúsculas (partículas, siglas SA/SL, tildes, espacios de más y observaciones con la primera letra).

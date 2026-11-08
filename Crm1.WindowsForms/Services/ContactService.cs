@@ -180,29 +180,6 @@ public sealed partial class ContactService
     }
 
     /// <summary>
-    /// Indica si un futuro cliente pasa el filtro del listado (specs/003): el
-    /// texto busca en las columnas visibles —coincidencia parcial, sin
-    /// mayúsculas ni tildes, como la búsqueda global— y el estado filtra cuando
-    /// se indica. Un texto vacío con estado null deja pasar todo.
-    /// </summary>
-    public static bool MatchesFilter(Contact contact, string? text, ContactStatus? status)
-    {
-        if (status.HasValue && contact.Status != status.Value)
-        {
-            return false;
-        }
-
-        string normalized = SearchService.NormalizeText(text ?? string.Empty);
-        if (normalized.Length == 0)
-        {
-            return true;
-        }
-
-        return SearchableValues(contact).Any(value =>
-            value.Length > 0 && SearchService.NormalizeText(value).Contains(normalized, StringComparison.Ordinal));
-    }
-
-    /// <summary>
     /// Convierte un futuro cliente en cliente (specs/003, sección 7): copia los
     /// datos, comprueba que cumplan TODAS las reglas de los clientes y devuelve
     /// el cliente listo (estado Activo, identificador nuevo) o la lista de
@@ -268,25 +245,4 @@ public sealed partial class ContactService
         nameof(Client.RegistrationDate) => "Fecha de alta",
         _ => field
     };
-
-    // Valores visibles de un futuro cliente en el orden de las columnas de la
-    // tabla; la fecha vacía no se busca (igual que la búsqueda global).
-    private static IEnumerable<string> SearchableValues(Contact contact)
-    {
-        yield return contact.FirstName;
-        yield return contact.LastName1;
-        yield return contact.LastName2;
-        yield return contact.TaxId;
-        yield return contact.Phone;
-        yield return contact.Email;
-        yield return contact.Address;
-        yield return contact.PostalCode;
-        yield return contact.City;
-        yield return contact.Province;
-        yield return contact.Status == ContactStatus.Discarded ? "Descartado" : "Pendiente";
-        yield return contact.RegistrationDate == default
-            ? string.Empty
-            : contact.RegistrationDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
-        yield return contact.Notes;
-    }
 }

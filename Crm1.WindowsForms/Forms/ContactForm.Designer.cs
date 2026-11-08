@@ -38,10 +38,6 @@ partial class ContactForm
         this.cancelButton = new System.Windows.Forms.Button();
         this.convertButton = new System.Windows.Forms.Button();
         this.filterPanel = new System.Windows.Forms.Panel();
-        this.searchLabel = new System.Windows.Forms.Label();
-        this.searchTextBox = new System.Windows.Forms.TextBox();
-        this.statusFilterLabel = new System.Windows.Forms.Label();
-        this.statusFilterComboBox = new System.Windows.Forms.ComboBox();
         this.counterLabel = new System.Windows.Forms.Label();
         this.contactsDataGridView = new System.Windows.Forms.DataGridView();
         this.firstNameColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
@@ -140,52 +136,12 @@ partial class ContactForm
         // filterPanel
         //
         this.filterPanel.BackColor = System.Drawing.Color.FromArgb(243, 244, 246);
-        this.filterPanel.Controls.Add(this.searchLabel);
-        this.filterPanel.Controls.Add(this.searchTextBox);
-        this.filterPanel.Controls.Add(this.statusFilterLabel);
-        this.filterPanel.Controls.Add(this.statusFilterComboBox);
         this.filterPanel.Controls.Add(this.counterLabel);
         this.filterPanel.Dock = System.Windows.Forms.DockStyle.Top;
         this.filterPanel.Location = new System.Drawing.Point(0, 60);
         this.filterPanel.Name = "filterPanel";
         this.filterPanel.Size = new System.Drawing.Size(1200, 40);
         this.filterPanel.TabIndex = 6;
-        //
-        // searchLabel
-        //
-        this.searchLabel.Location = new System.Drawing.Point(10, 9);
-        this.searchLabel.Name = "searchLabel";
-        this.searchLabel.Size = new System.Drawing.Size(50, 20);
-        this.searchLabel.Text = "Buscar:";
-        //
-        // searchTextBox
-        //
-        this.searchTextBox.Location = new System.Drawing.Point(65, 6);
-        this.searchTextBox.Name = "searchTextBox";
-        this.searchTextBox.Size = new System.Drawing.Size(240, 23);
-        this.searchTextBox.TabIndex = 0;
-        this.searchTextBox.TextChanged += new System.EventHandler(this.SearchTextBox_TextChanged);
-        //
-        // statusFilterLabel
-        //
-        this.statusFilterLabel.Location = new System.Drawing.Point(320, 9);
-        this.statusFilterLabel.Name = "statusFilterLabel";
-        this.statusFilterLabel.Size = new System.Drawing.Size(45, 20);
-        this.statusFilterLabel.Text = "Estado:";
-        //
-        // statusFilterComboBox
-        //
-        this.statusFilterComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-        this.statusFilterComboBox.Items.AddRange(new object[] {
-        "Todos",
-        "Pendiente",
-        "Descartado"});
-        this.statusFilterComboBox.Location = new System.Drawing.Point(370, 6);
-        this.statusFilterComboBox.Name = "statusFilterComboBox";
-        this.statusFilterComboBox.SelectedIndex = 0;
-        this.statusFilterComboBox.Size = new System.Drawing.Size(120, 23);
-        this.statusFilterComboBox.TabIndex = 1;
-        this.statusFilterComboBox.SelectedIndexChanged += new System.EventHandler(this.StatusFilterComboBox_SelectedIndexChanged);
         //
         // counterLabel
         //
@@ -194,7 +150,7 @@ partial class ContactForm
         this.counterLabel.Name = "counterLabel";
         this.counterLabel.Size = new System.Drawing.Size(210, 20);
         this.counterLabel.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-        // El texto se rellena desde ApplyFilter.
+        // El texto se rellena desde UpdateCounter.
         //
         // contactsDataGridView
         //
@@ -331,10 +287,6 @@ partial class ContactForm
     private System.Windows.Forms.Button cancelButton;
     private System.Windows.Forms.Button convertButton;
     private System.Windows.Forms.Panel filterPanel;
-    private System.Windows.Forms.Label searchLabel;
-    private System.Windows.Forms.TextBox searchTextBox;
-    private System.Windows.Forms.Label statusFilterLabel;
-    private System.Windows.Forms.ComboBox statusFilterComboBox;
     private System.Windows.Forms.Label counterLabel;
     private System.Windows.Forms.DataGridView contactsDataGridView;
     private System.Windows.Forms.DataGridViewTextBoxColumn firstNameColumn;

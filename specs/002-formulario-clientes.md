@@ -23,7 +23,7 @@ Formulario del módulo de clientes: tabla con todos los campos del cliente y bot
 | `saveButton`      | Guardar   | Implementado (sección 4) |
 | `cancelButton`    | Cancelar  | Implementado (sección 4) |
 
-- Barra de filtro (`filterPanel`, 40 px, fondo #F3F4F6) bajo la botonera: cuadro de texto `searchTextBox` con **búsqueda en vivo** (coincidencia parcial, sin mayúsculas ni tildes, en las 13 columnas), desplegable `statusFilterComboBox` (Todos / Activo / Inactivo) y contador `counterLabel` "Mostrando X de Y". Bloqueada durante la edición, igual que la botonera; si el cliente actual queda oculto, la marca se retira. Implementado.
+- Barra de información (`filterPanel`, 40 px, fondo #F3F4F6) bajo la botonera con el contador `counterLabel` "Mostrando X de Y". Sin filtro local: **la búsqueda se realiza desde el formulario principal** (búsqueda global, specs/004).
 
 - Tabla `clientsDataGridView` con las columnas **en este orden**:
 
@@ -60,7 +60,7 @@ Formulario del módulo de clientes: tabla con todos los campos del cliente y bot
 - **Filas deshabilitadas durante la edición**: mientras hay una fila activa, las demás se ven atenuadas en gris y no se pueden seleccionar (ni con clic ni con teclado: la selección y la celda actual vuelven a la fila en edición); se rehabilitan al guardar con éxito o al cancelar.
 - **Cliente actual (skill «seleccionar-cliente»)**: un clic en cualquier celda de una fila (o el teclado) la marca como cliente actual, rastreado **por identificador** (nunca por índice) y expuesto como `CurrentClient`/`CurrentClientId` para acciones futuras. Sin selección no hay cliente actual; la fila marcada se ve rodeada por un **borde grueso** (la marca visual del patrón, también en la fila en edición); si la fila marcada desaparece, la marca se limpia; tras Guardar, la marca se mantiene sobre el mismo identificador. **Modificar actúa sobre el cliente actual** (aviso si no hay ninguno marcado).
 - **Navegación desde la búsqueda global (specs/004)**: `IsEditing` expone si hay una edición en curso y `SelectClientById(Guid)` marca como cliente actual el indicado y desplaza la tabla hasta su fila; los usa `MainForm` al elegir un resultado de búsqueda. Con edición en curso o registro ausente, la búsqueda avisa y no navega.
-- **Búsqueda y filtro del listado**: la barra `filterPanel` filtra en vivo las filas de la tabla con `ClientService.MatchesFilter` (mismas reglas de coincidencia que la búsqueda global); el contador muestra cuántas filas se ven de cuántas hay y las acciones actúan solo sobre lo visible.
+- **Contador del listado**: la barra bajo la botonera muestra cuántas filas con datos hay en la tabla ("Mostrando X de Y", siempre iguales al no haber filtro). Sin búsqueda ni filtro local: la búsqueda se hace desde el formulario principal (specs/004).
 - **Recarga al volver al módulo**: si `clients.json` cambió en disco mientras el formulario no estaba visible (p. ej. una conversión desde Futuros clientes) y aquí no hay cambios sin guardar, la tabla se recarga sola al mostrarse; si hay cambios pendientes, la recarga espera a una activación limpia. Al guardar, los registros añadidos desde fuera se conservan y la tabla se aplica sobre ellos.
 - **Guardar**:
   1. Confirma la celda en edición (`EndEdit`).

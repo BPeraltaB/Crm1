@@ -221,10 +221,6 @@ public partial class ContactForm : System.Windows.Forms.Form
         saveButton.Enabled = _canSave;
         cancelButton.Enabled = _canSave && editing;
         convertButton.Enabled = _canSave && !editing;
-
-        // La barra de filtro también queda bloqueada mientras hay edición.
-        searchTextBox.Enabled = _canSave && !editing;
-        statusFilterComboBox.Enabled = _canSave && !editing;
     }
 
     /// <summary>
@@ -288,7 +284,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
         SetColumnsSortable(true);
         UpdateButtonStates();
-        ApplyFilter();
+        UpdateCounter();
     }
 
     /// <summary>
@@ -350,105 +346,34 @@ public partial class ContactForm : System.Windows.Forms.Form
         _currentContactId = null;
         contactsDataGridView.ClearSelection();
 
-        // Aplica el filtro vigente y actualiza el contador del listado.
-        ApplyFilter();
+        // Actualiza el contador del listado.
+        UpdateCounter();
     }
 
     /// <summary>
-    /// Aplica el filtro del listado (specs/003): quedan visibles las filas que
-    /// cumplen el texto buscado (parcial, sin mayúsculas ni tildes, en todas
-    /// las columnas) y el estado del desplegable; el contador muestra cuántas
-    /// se ven de cuántas hay.
+    /// Actualiza el contador del listado (specs/003). Sin filtro local — la
+    /// búsqueda se hace desde el formulario principal (specs/004) — todas las
+    /// filas están visibles y cuenta cuántas filas con datos hay en la tabla.
     /// </summary>
-    private void ApplyFilter()
+    private void UpdateCounter()
     {
         if (_loading)
         {
             return;
         }
 
-        ContactStatus? status = SelectedStatusFilter();
-        string text = searchTextBox.Text;
-
-        // Se recuerda el futuro cliente actual porque al soltar la celda o la
-        // selección el evento SelectionChanged limpia la marca; se restaura al
-        // final si su fila sigue visible.
-        Guid? currentId = _currentContactId;
-
-        int visibleCount = 0;
         int totalCount = 0;
         foreach (System.Windows.Forms.DataGridViewRow row in contactsDataGridView.Rows)
         {
-            // Las filas vacías (solo posibles con edición abierta) se dejan ver.
-            if (IsEmptyRow(row))
+            row.Visible = true;
+            if (!IsEmptyRow(row))
             {
-                row.Visible = true;
-                continue;
-            }
-
-            totalCount++;
-            bool matches = ContactService.MatchesFilter(MapRowToContact(row, out _), text, status);
-
-            // La celda actual se suelta antes de ocultar su fila: el control no
-            // permite ocultar la fila que la contiene.
-            if (!matches && contactsDataGridView.CurrentCell?.OwningRow == row)
-            {
-                contactsDataGridView.CurrentCell = null;
-                contactsDataGridView.ClearSelection();
-            }
-
-            row.Visible = matches;
-            if (matches)
-            {
-                visibleCount++;
+                totalCount++;
             }
         }
 
-        counterLabel.Text = $"Mostrando {visibleCount} de {totalCount}";
-
-        // Si el futuro cliente actual quedó oculto por el filtro, la marca se
-        // retira (volverá a marcarse con un clic cuando vuelva a verse); si
-        // sigue visible, conserva la selección.
-        System.Windows.Forms.DataGridViewRow? currentRow = FindRowById(currentId);
-        if (currentRow is null || !currentRow.Visible)
-        {
-            contactsDataGridView.ClearSelection();
-            _currentContactId = null;
-        }
-        else
-        {
-            _currentContactId = currentId;
-            _restoringSelection = true;
-            try
-            {
-                currentRow.Selected = true;
-            }
-            finally
-            {
-                _restoringSelection = false;
-            }
-        }
+        counterLabel.Text = $"Mostrando {totalCount} de {totalCount}";
     }
-
-    /// <summary>
-    /// Estado seleccionado en el desplegable del filtro; null = Todos.
-    /// </summary>
-    private ContactStatus? SelectedStatusFilter() => statusFilterComboBox.SelectedIndex switch
-    {
-        1 => ContactStatus.Pending,
-        2 => ContactStatus.Discarded,
-        _ => null
-    };
-
-    /// <summary>
-    /// Vuelve a aplicar el filtro al cambiar el texto buscado (búsqueda en vivo).
-    /// </summary>
-    private void SearchTextBox_TextChanged(object? sender, EventArgs e) => ApplyFilter();
-
-    /// <summary>
-    /// Vuelve a aplicar el filtro al cambiar el estado del desplegable.
-    /// </summary>
-    private void StatusFilterComboBox_SelectedIndexChanged(object? sender, EventArgs e) => ApplyFilter();
 
     /// <summary>
     /// Añade a la tabla una fila con los datos de un futuro cliente guardado.
@@ -671,7 +596,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         contactsDataGridView.Rows.Remove(row);
         EnsureCurrentContactExists();
         _dirty = true;
-        ApplyFilter();
+        UpdateCounter();
     }
 
     /// <summary>
@@ -733,7 +658,7 @@ public partial class ContactForm : System.Windows.Forms.Form
             _convertedContacts.Clear();
             _dirty = GridDiffersFromSaved();
             EnsureCurrentContactExists();
-            ApplyFilter();
+            UpdateCounter();
             return;
         }
 

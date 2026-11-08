@@ -1,10 +1,10 @@
 # Especificación 000: Fundamentos y módulo Clientes
 
-**Estado:** Activa y **implementada** en su alcance de Clientes: `MainForm` (menú "Clientes" muestra `ClientForm` embebido en su área central), `ClientForm` con carga, alta, edición, baja y guardado (specs/002), modelo `Client`, reglas de negocio en `ClientService`, catálogo de códigos postales, `JsonDataStore` y pruebas en `Crm1.Tests`. Pendiente del módulo: búsqueda y filtro. El módulo de Futuros clientes (`ContactForm`) está especificado e implementado en specs/003-formulario-futuros-clientes.md. El resto de módulos del diseño general queda pendiente (sección 8).
+**Estado:** Activa y **implementada** en su alcance de Clientes: `MainForm` (menú "Clientes" muestra `ClientForm` embebido en su área central), `ClientForm` con carga, alta, edición, baja y guardado (specs/002), modelo `Client`, reglas de negocio en `ClientService`, catálogo de códigos postales, `JsonDataStore` y pruebas en `Crm1.Tests`. La búsqueda se realiza desde el formulario principal (búsqueda global, specs/004); sin filtro local en los módulos. El módulo de Futuros clientes (`ContactForm`) está especificado e implementado en specs/003-formulario-futuros-clientes.md. El resto de módulos del diseño general queda pendiente (sección 8).
 
 ## 1. Alcance
 
-Primera versión funcional de CRM1 centrada en el módulo de Clientes: alta, edición, baja, listado, búsqueda y filtro. La búsqueda y el filtro quedan **pendientes** (ver sección 8).
+Primera versión funcional de CRM1 centrada en el módulo de Clientes: alta, edición, baja y listado, con búsqueda global (specs/004). Sin filtro local en los módulos.
 
 ## 2. Solución y proyectos
 
@@ -86,4 +86,4 @@ Todas las reglas viven fuera de los formularios (constitución, punto 3). El doc
 
 ## 8. Fuera de alcance (pendiente)
 
-Búsqueda y filtro del módulo de clientes, contactos, oportunidades, tareas, recordatorios, presupuestos, pedidos, servicios, ventas, historial por cliente, formatos TXT y binario, SQL y exportación de datos.
+Ampliación de la búsqueda global (specs/004) a más módulos, contactos, oportunidades, tareas, recordatorios, presupuestos, pedidos, servicios, ventas, historial por cliente, formatos TXT y binario, SQL y exportación de datos.

@@ -230,39 +230,6 @@ public sealed class ContactServiceTests : IDisposable
         Assert.Equal(0, error.RowIndex);
     }
 
-    // Pruebas del filtro del listado (specs/003, búsqueda y filtro).
-
-    [Fact]
-    public void Contact_filter_with_empty_text_and_no_status_returns_everything()
-    {
-        Assert.True(ContactService.MatchesFilter(ValidContact(), "  ", null));
-    }
-
-    [Fact]
-    public void Contact_filter_matches_without_accents()
-    {
-        Contact contact = ValidContact(c => c.LastName1 = "Fernández");
-        Assert.True(ContactService.MatchesFilter(contact, "fernandez", null));
-    }
-
-    [Fact]
-    public void Contact_filter_by_status_excludes_the_other_state()
-    {
-        Contact pending = ValidContact();
-        Contact discarded = ValidContact(c => c.Status = ContactStatus.Discarded);
-
-        Assert.True(ContactService.MatchesFilter(pending, null, ContactStatus.Pending));
-        Assert.False(ContactService.MatchesFilter(discarded, null, ContactStatus.Pending));
-        Assert.True(ContactService.MatchesFilter(discarded, null, ContactStatus.Discarded));
-    }
-
-    [Fact]
-    public void Contact_without_date_does_not_match_date_searches()
-    {
-        // La fecha vacía de un futuro cliente no se busca (igual que en la búsqueda global).
-        Assert.False(ContactService.MatchesFilter(ValidContact(), "15/01/2026", null));
-    }
-
     // Pruebas de la conversión de futuro cliente en cliente (specs/003, sección 7).
 
     // Futuro cliente que ya cumple todas las reglas de los clientes.
