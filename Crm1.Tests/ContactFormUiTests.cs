@@ -6,7 +6,7 @@ namespace Crm1.Tests;
 
 /// <summary>
 /// Pruebas de interfaz de ContactForm (specs/003) con el formulario REAL
-/// instanciado en un hilo STA: Nuevo/Modificar/Cancelar, filtro del listado,
+/// instanciado en un hilo STA: Nuevo/Modificar/Cancelar, contador del listado,
 /// Guardar y la conversión en cliente con doble confirmación. Los diálogos se
 /// responden con PromptRecorder en lugar de MessageBox.
 /// </summary>
@@ -49,37 +49,6 @@ public sealed class ContactFormUiTests
         });
     }
 
-    // El mismo flujo con un filtro activo (el caso que disparaba el error).
-    [Fact]
-    public void New_row_cancelled_with_an_active_filter_does_not_fail()
-    {
-        UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
-        UiTestEnvironment.WriteContacts(
-            Fixtures.Contact("Elena"),
-            Fixtures.Contact("Iker"));
-
-        WinFormsSta.Run(() =>
-        {
-            using var form = new ContactForm();
-            var recorder = new PromptRecorder();
-            form.Prompt = recorder.Answer;
-            DataGridView grid = FormAccess.Grid(form, "contactsDataGridView");
-            TextBox search = FormAccess.TextBox(form, "searchTextBox");
-
-            search.Text = "elen";
-            Assert.Equal("Mostrando 1 de 2", FormAccess.Label(form, "counterLabel").Text);
-
-            FormAccess.Click(form, "NewButton_Click");
-            grid.Rows[0].Cells["firstNameColumn"].Value = "Prueba";
-
-            FormAccess.Click(form, "CancelButton_Click");
-
-            Assert.Equal(2, grid.Rows.Count);
-            Assert.Equal("Mostrando 1 de 2", FormAccess.Label(form, "counterLabel").Text);
-            Assert.Empty(recorder.Messages);
-        });
-    }
-
     [Fact]
     public void Modify_then_cancel_restores_the_previous_values()
     {
@@ -110,8 +79,11 @@ public sealed class ContactFormUiTests
         });
     }
 
+    // Sin filtro local (specs/003: la búsqueda vive en el formulario
+    // principal, specs/004), el contador refleja cuántas filas con datos hay;
+    // las filas vacías de un Nuevo en curso no cuentan.
     [Fact]
-    public void Filter_by_status_and_text_counts_only_the_visible()
+    public void Counter_counts_rows_with_data_and_ignores_empty_new_rows()
     {
         UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
         UiTestEnvironment.WriteContacts(
@@ -123,20 +95,15 @@ public sealed class ContactFormUiTests
             using var form = new ContactForm();
             form.Prompt = new PromptRecorder().Answer;
             DataGridView grid = FormAccess.Grid(form, "contactsDataGridView");
-            ComboBox statusFilter = FormAccess.ComboBox(form, "statusFilterComboBox");
             Label counter = FormAccess.Label(form, "counterLabel");
 
-            statusFilter.SelectedIndex = 2; // Descartado
-            Assert.Equal("Mostrando 1 de 2", counter.Text);
-            Assert.True(grid.Rows[1].Visible);
-            Assert.False(grid.Rows[0].Visible);
+            Assert.Equal("Mostrando 2 de 2", counter.Text);
 
-            statusFilter.SelectedIndex = 1; // Pendiente
-            Assert.Equal("Mostrando 1 de 2", counter.Text);
-
-            statusFilter.SelectedIndex = 0; // Todos + texto
-            FormAccess.TextBox(form, "searchTextBox").Text = "iker";
-            Assert.Equal("Mostrando 1 de 2", counter.Text);
+            FormAccess.Click(form, "NewButton_Click");
+            Assert.Equal(3, grid.Rows.Count);
+            FormAccess.Click(form, "CancelButton_Click");
+            Assert.Equal(2, grid.Rows.Count);
+            Assert.Equal("Mostrando 2 de 2", counter.Text);
         });
     }
 
@@ -172,7 +139,7 @@ public sealed class ContactFormUiTests
             Assert.Contains("dado de alta 1 cliente(s)", recorder.Messages[2]);
             Assert.False(form.HasUnsavedChanges);
 
-            Assert.Equal(1, UiTestEnvironment.ReadContacts().Count);
+            Assert.Single(UiTestEnvironment.ReadContacts());
             List<Client> clients = UiTestEnvironment.ReadClients();
             Assert.Equal(3, clients.Count);
             Client converted = clients.Single(client => client.TaxId == "11111111H");

@@ -6,7 +6,7 @@ namespace Crm1.Tests;
 
 /// <summary>
 /// Pruebas de interfaz de ClientForm (specs/002) con el formulario REAL
-/// instanciado en un hilo STA: Nuevo/Modificar/Cancelar, filtro del listado,
+/// instanciado en un hilo STA: Nuevo/Modificar/Cancelar, contador del listado,
 /// Guardar, Eliminar y la fusión con clientes añadidos desde fuera. Los
 /// diálogos se responden con PromptRecorder en lugar de MessageBox.
 /// </summary>
@@ -43,38 +43,6 @@ public sealed class ClientFormUiTests
 
             Assert.Equal(3, grid.Rows.Count);
             Assert.False(form.HasUnsavedChanges);
-            Assert.Empty(recorder.Messages);
-        });
-    }
-
-    // El mismo flujo con un filtro activo (el caso que disparaba el error).
-    [Fact]
-    public void New_row_cancelled_with_an_active_filter_does_not_fail()
-    {
-        UiTestEnvironment.WriteClients(
-            Fixtures.Client("Ana", "12345678Z"),
-            Fixtures.Client("Luis", "23456781R"),
-            Fixtures.Client("Zulema", "34567812P"));
-
-        WinFormsSta.Run(() =>
-        {
-            using var form = new ClientForm();
-            var recorder = new PromptRecorder();
-            form.Prompt = recorder.Answer;
-            DataGridView grid = FormAccess.Grid(form, "clientsDataGridView");
-            TextBox search = FormAccess.TextBox(form, "searchTextBox");
-
-            search.Text = "luis";
-            Assert.Equal("Mostrando 1 de 3", FormAccess.Label(form, "counterLabel").Text);
-            Assert.False(grid.Rows[0].Visible);
-
-            FormAccess.Click(form, "NewButton_Click");
-            grid.Rows[0].Cells["firstNameColumn"].Value = "Prueba";
-
-            FormAccess.Click(form, "CancelButton_Click");
-
-            Assert.Equal(3, grid.Rows.Count);
-            Assert.Equal("Mostrando 1 de 3", FormAccess.Label(form, "counterLabel").Text);
             Assert.Empty(recorder.Messages);
         });
     }
@@ -132,8 +100,11 @@ public sealed class ClientFormUiTests
         });
     }
 
+    // Sin filtro local (specs/002: la búsqueda vive en el formulario
+    // principal, specs/004), el contador refleja cuántas filas con datos hay
+    // en la tabla; las filas vacías de un Nuevo en curso no cuentan.
     [Fact]
-    public void Filter_text_hides_rows_and_the_counter_counts_only_the_visible()
+    public void Counter_counts_rows_with_data_and_ignores_empty_new_rows()
     {
         UiTestEnvironment.WriteClients(
             Fixtures.Client("Ana", "12345678Z"),
@@ -145,112 +116,16 @@ public sealed class ClientFormUiTests
             using var form = new ClientForm();
             form.Prompt = new PromptRecorder().Answer;
             DataGridView grid = FormAccess.Grid(form, "clientsDataGridView");
-            TextBox search = FormAccess.TextBox(form, "searchTextBox");
             Label counter = FormAccess.Label(form, "counterLabel");
 
-            search.Text = "luis";
-            Assert.Equal("Mostrando 1 de 3", counter.Text);
-            Assert.True(grid.Rows[1].Visible);
-            Assert.False(grid.Rows[0].Visible);
-            Assert.False(grid.Rows[2].Visible);
-
-            search.Text = "zzz";
-            Assert.Equal("Mostrando 0 de 3", counter.Text);
-
-            search.Text = string.Empty;
             Assert.Equal("Mostrando 3 de 3", counter.Text);
-        });
-    }
 
-    [Fact]
-    public void Filter_that_hides_the_current_row_clears_the_selection()
-    {
-        Client ana = Fixtures.Client("Ana", "12345678Z");
-        Client luis = Fixtures.Client("Luis", "23456781R");
-        Client zulema = Fixtures.Client("Zulema", "34567812P");
-        UiTestEnvironment.WriteClients(ana, luis, zulema);
-
-        WinFormsSta.Run(() =>
-        {
-            using var form = new ClientForm();
-            form.Prompt = new PromptRecorder().Answer;
-            DataGridView grid = FormAccess.Grid(form, "clientsDataGridView");
-            TextBox search = FormAccess.TextBox(form, "searchTextBox");
-
-            grid.CurrentCell = grid.Rows[2].Cells["firstNameColumn"];
-            Assert.Equal(zulema.Id, form.CurrentClientId);
-
-            // El filtro oculta la fila marcada: la marca se retira.
-            search.Text = "luis";
-            Assert.Null(form.CurrentClientId);
-            Assert.Equal(0, grid.SelectedRows.Count);
-
-            // Al limpiar el filtro la fila vuelve, pero sin marca (habrá que
-            // volver a marcarla con un clic).
-            search.Text = string.Empty;
-            Assert.True(grid.Rows[2].Visible);
-            Assert.Null(form.CurrentClientId);
-        });
-    }
-
-    [Fact]
-    public void Filter_by_status_shows_only_that_state()
-    {
-        UiTestEnvironment.WriteClients(
-            Fixtures.Client("Ana", "12345678Z", ClientStatus.Active),
-            Fixtures.Client("Bruno", "23456781R", ClientStatus.Inactive),
-            Fixtures.Client("Carla", "34567812P", ClientStatus.Active));
-
-        WinFormsSta.Run(() =>
-        {
-            using var form = new ClientForm();
-            form.Prompt = new PromptRecorder().Answer;
-            DataGridView grid = FormAccess.Grid(form, "clientsDataGridView");
-            ComboBox statusFilter = FormAccess.ComboBox(form, "statusFilterComboBox");
-            Label counter = FormAccess.Label(form, "counterLabel");
-
-            statusFilter.SelectedIndex = 2; // Inactivo
-            Assert.Equal("Mostrando 1 de 3", counter.Text);
-            Assert.True(grid.Rows[1].Visible);
-            Assert.False(grid.Rows[0].Visible);
-            Assert.False(grid.Rows[2].Visible);
-
-            statusFilter.SelectedIndex = 1; // Activo
-            Assert.Equal("Mostrando 2 de 3", counter.Text);
-
-            statusFilter.SelectedIndex = 0; // Todos
-            Assert.Equal("Mostrando 3 de 3", counter.Text);
-        });
-    }
-
-    [Fact]
-    public void Filter_then_modify_then_cancel_keeps_the_filter_and_the_values()
-    {
-        UiTestEnvironment.WriteClients(
-            Fixtures.Client("Ana", "12345678Z"),
-            Fixtures.Client("Luis", "23456781R"),
-            Fixtures.Client("Zulema", "34567812P"));
-
-        WinFormsSta.Run(() =>
-        {
-            using var form = new ClientForm();
-            form.Prompt = new PromptRecorder().Answer;
-            DataGridView grid = FormAccess.Grid(form, "clientsDataGridView");
-            TextBox search = FormAccess.TextBox(form, "searchTextBox");
-            Label counter = FormAccess.Label(form, "counterLabel");
-
-            search.Text = "luis";
-            grid.CurrentCell = grid.Rows[1].Cells["firstNameColumn"];
-
-            FormAccess.Click(form, "ModifyButton_Click");
-            Assert.False(search.Enabled); // el filtro se bloquea al editar
-            grid.Rows[1].Cells["firstNameColumn"].Value = "Lucho";
-
+            // La fila vacía del Nuevo y su Cancelar no alteran el contador.
+            FormAccess.Click(form, "NewButton_Click");
+            Assert.Equal(4, grid.Rows.Count);
             FormAccess.Click(form, "CancelButton_Click");
-
-            Assert.True(search.Enabled);
-            Assert.Equal("Luis", FormAccess.CellText(grid.Rows[1], "firstNameColumn"));
-            Assert.Equal("Mostrando 1 de 3", counter.Text);
+            Assert.Equal(3, grid.Rows.Count);
+            Assert.Equal("Mostrando 3 de 3", counter.Text);
         });
     }
 
@@ -488,12 +363,12 @@ public sealed class ClientFormUiTests
     }
 
     [Fact]
-    public void Sorting_with_a_filter_keeps_only_the_matching_rows_visible()
+    public void Sorting_by_name_reorders_the_rows_and_keeps_them_all_visible()
     {
         UiTestEnvironment.WriteClients(
+            Fixtures.Client("Zulema", "34567812P"),
             Fixtures.Client("Ana", "12345678Z"),
-            Fixtures.Client("Luis", "23456781R"),
-            Fixtures.Client("Zulema", "34567812P"));
+            Fixtures.Client("Luis", "23456781R"));
 
         WinFormsSta.Run(() =>
         {
@@ -501,14 +376,14 @@ public sealed class ClientFormUiTests
             form.Prompt = new PromptRecorder().Answer;
             DataGridView grid = FormAccess.Grid(form, "clientsDataGridView");
             Label counter = FormAccess.Label(form, "counterLabel");
-            FormAccess.TextBox(form, "searchTextBox").Text = "luis";
 
             grid.Sort(grid.Columns["firstNameColumn"], System.ComponentModel.ListSortDirection.Ascending);
 
-            Assert.Equal("Mostrando 1 de 3", counter.Text);
-            DataGridViewRow? visible = grid.Rows.Cast<DataGridViewRow>().SingleOrDefault(row => row.Visible);
-            Assert.NotNull(visible);
-            Assert.Equal("Luis", FormAccess.CellText(visible!, "firstNameColumn"));
+            Assert.Equal("Ana", FormAccess.CellText(grid.Rows[0], "firstNameColumn"));
+            Assert.Equal("Luis", FormAccess.CellText(grid.Rows[1], "firstNameColumn"));
+            Assert.Equal("Zulema", FormAccess.CellText(grid.Rows[2], "firstNameColumn"));
+            Assert.Equal("Mostrando 3 de 3", counter.Text);
+            Assert.All(grid.Rows.Cast<DataGridViewRow>(), row => Assert.True(row.Visible));
         });
     }
 }
