@@ -1,6 +1,6 @@
 # Especificación 000: Fundamentos y módulo Clientes
 
-**Estado:** Activa y **implementada** en su alcance de Clientes: `MainForm` (menú "Clientes" muestra `ClientForm` embebido en su área central), `ClientForm` con carga, alta, edición, baja y guardado (specs/002), modelo `Client`, reglas de negocio en `ClientService`, catálogo de códigos postales, `JsonDataStore` y pruebas en `Crm1.Tests`. La búsqueda se realiza desde el formulario principal (búsqueda global, specs/004); sin filtro local en los módulos. El módulo de Futuros clientes (`ContactForm`) está especificado e implementado en specs/003-formulario-futuros-clientes.md. El resto de módulos del diseño general queda pendiente (sección 8).
+**Estado:** Activa y **implementada** en su alcance de Clientes: `MainForm` (menú "Clientes" muestra `ClientForm` embebido en su área central), `ClientForm` con carga, alta, edición, baja y guardado (specs/002), modelo `Client`, reglas de negocio en `ClientService`, catálogo de códigos postales, almacenamiento SQL (specs/006) y pruebas en `Crm1.Tests`. La búsqueda se realiza desde el formulario principal (búsqueda global, specs/004); sin filtro local en los módulos. El módulo de Futuros clientes (`ContactForm`) está especificado e implementado en specs/003-formulario-futuros-clientes.md. El resto de módulos del diseño general queda pendiente (sección 8).
 
 ## 1. Alcance
 
@@ -17,10 +17,10 @@ Primera versión funcional de CRM1 centrada en el módulo de Clientes: alta, edi
 
 - La aplicación inicia con el formulario principal `MainForm` (clase parcial `Crm1.WindowsForms.Forms.MainForm`), dividido en `Crm1.WindowsForms/Forms/MainForm.cs` y `Forms/MainForm.Designer.cs` para poder editarlo con el diseñador de Visual Studio. La clase no se llama `Form` a propósito: colisiona con `System.Windows.Forms.Form` y el diseñador de VS no la cargaría.
 - Diseño: ventana de 1200×750 (mínimo 900×600), título "CRM1", centrada en pantalla.
-  - Menú lateral (`MenuStrip` vertical, 220 px, tema oscuro #2D3748 con renderer propio) con: título "CRM1", Clientes, Búsqueda, Futuros clientes y Salir. Salir cierra la aplicación; Clientes muestra `ClientForm`, Futuros clientes muestra `ContactForm` y Búsqueda muestra `SearchForm` (specs/004-busqueda-global.md), embebidos en el área central (`panelContent`) de MainForm — **implementados**.
+  - Menú lateral (`MenuStrip` vertical, 220 px, tema oscuro #2D3748 con renderer propio) con: título "CRM1", Clientes, Búsqueda, Futuros clientes, Tareas y Salir. Salir cierra la aplicación; Clientes muestra `ClientForm`, Futuros clientes muestra `ContactForm`, Búsqueda muestra `SearchForm` (specs/004-busqueda-global.md) y Tareas muestra `TaskForm` (specs/005-tareas.md, por ahora solo diseño, sin datos), embebidos en el área central (`panelContent`) de MainForm — **implementados**.
   - Área central clara (#F3F4F6) vacía, reservada para el contenido de los módulos futuros.
   - Barra de estado inferior blanca con "CRM1 — v0.1" y fecha/hora actualizada cada 30 segundos.
-- "Futuros clientes" es el módulo de seguimiento previo a ser cliente: `ContactForm`, especificado e implementado en specs/003-formulario-futuros-clientes.md. El módulo "Contactos" original (personas de contacto de cada cliente) queda por decidir; el resto de módulos del diseño general (oportunidades, tareas, etc.) se ubicarán en otro formulario en el futuro, no en este menú.
+- "Futuros clientes" es el módulo de seguimiento previo a ser cliente: `ContactForm`, especificado e implementado en specs/003-formulario-futuros-clientes.md. El módulo "Contactos" original (personas de contacto de cada cliente) queda por decidir; "Tareas" abre `TaskForm` (solo diseño, specs/005-tareas.md) y el resto de módulos del diseño general (oportunidades, recordatorios, etc.) se ubicarán en otro formulario en el futuro, no en este menú.
 - `ClientForm` (`Crm1.WindowsForms/Forms/ClientForm.cs` + `Forms/ClientForm.Designer.cs`): formulario del módulo de clientes; su diseño y comportamiento se definen en specs/002-formulario-clientes.md.
 
 ## 3. Modelo de datos: Client
@@ -57,13 +57,11 @@ Todas las reglas viven fuera de los formularios (constitución, punto 3). El doc
 9. **Documento único**: no puede repetirse entre los clientes guardados ni entre filas de la tabla (comparación normalizada).
 10. **Errores**: antes de guardar nada, cada celda con error se marca con un **borde rojo alrededor** (las celdas permanecen siempre blancas) y se muestra un mensaje corto por error, dirigido a la celda (p. ej. «La celda está vacía.»). El borde desaparece en cuanto se corrige la celda. La tabla de mensajes está en specs/002, sección 4.1.
 
-## 5. Almacenamiento (JSON)
+## 5. Almacenamiento (SQL, SQLite)
 
-- Interfaz `IDataStore` con implementación `JsonDataStore`.
-- Los clientes se guardan en `Data/clients.json` junto al ejecutable (carpeta `Data/` creada automáticamente). Escritura **atómica**: archivo temporal + reemplazo, para no perder el archivo anterior si la escritura falla.
-- Los futuros clientes se guardan en `Data/contacts.json`, archivo distinto e independiente de `clients.json`, con la misma escritura atómica (specs/003).
-- Un fallo de lectura o escritura debe provocar un error visible, nunca presentarse como éxito ni descartar datos silenciosamente (constitución, punto 5). Un archivo inexistente se interpreta como lista vacía (primera ejecución). Salir del formulario sin guardar nunca modifica el archivo.
-- Formato de archivo: JSON (System.Text.Json, UTF-8 legible). Los formatos TXT y binario quedan pendientes; SQL queda pendiente hasta especificación futura.
+- Interfaz `IDataStore` con implementación `SqlDataStore` (specs/006-almacenamiento-sql.md): base de datos local `Data/crm1.db` junto al ejecutable (carpeta `Data/` creada automáticamente), tablas `Clients`, `Contacts` y `Tasks` (specs/005) creadas automáticamente y escrituras **transaccionales** (guardar reemplaza el contenido de la tabla).
+- Un fallo de lectura o escritura debe provocar un error visible, nunca presentarse como éxito ni descartar datos silenciosamente (constitución, punto 5). Salir del formulario sin guardar nunca modifica la base de datos: solo Guardar escribe.
+- **Migración**: los antiguos `Data/clients.json` y `Data/contacts.json` se importan automáticamente la primera vez (una sola, sin duplicar) y se conservan en disco intactos como copia histórica (specs/006, sección 4). Todo dato nuevo de módulos futuros se guarda en SQL; los formatos TXT y binario quedan pendientes.
 
 ### 5.1 Catálogo de códigos postales
 
@@ -86,4 +84,4 @@ Todas las reglas viven fuera de los formularios (constitución, punto 3). El doc
 
 ## 8. Fuera de alcance (pendiente)
 
-Ampliación de la búsqueda global (specs/004) a más módulos, contactos, oportunidades, tareas, recordatorios, presupuestos, pedidos, servicios, ventas, historial por cliente, formatos TXT y binario, SQL y exportación de datos.
+Ampliación de la búsqueda global (specs/004) a más módulos, contactos, oportunidades, tareas (edición completa, specs/005), recordatorios, presupuestos, pedidos, servicios, ventas, historial por cliente, formatos TXT y binario y exportación de datos.
