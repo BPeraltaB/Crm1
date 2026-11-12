@@ -16,7 +16,7 @@ public partial class SearchForm : System.Windows.Forms.Form
     private const float SelectionBorderWidth = 3F;
 
     // Lectura de los archivos de datos; la búsqueda nunca escribe en disco.
-    private readonly IDataStore _dataStore = new JsonDataStore();
+    private readonly IDataStore _dataStore = new SqlDataStore();
 
     /// <summary>
     /// Se lanza al elegir un resultado (doble clic o Enter) para pedir a
@@ -75,7 +75,7 @@ public partial class SearchForm : System.Windows.Forms.Form
         catch (Exception ex)
         {
             MessageBox.Show(this,
-                "No se pudieron leer los archivos de datos (Data/clients.json y Data/contacts.json).\n\n" +
+                "No se pudo leer la base de datos (Data/crm1.db).\n\n" +
                 ex.Message,
                 "CRM1 — Error de datos",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);

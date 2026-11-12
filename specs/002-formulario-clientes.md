@@ -22,6 +22,7 @@ Formulario del módulo de clientes: tabla con todos los campos del cliente y bot
 | `deleteButton`    | Eliminar  | Implementado (sección 4) |
 | `saveButton`      | Guardar   | Implementado (sección 4) |
 | `cancelButton`    | Cancelar  | Implementado (sección 4) |
+| `tasksButton`     | Tareas    | Implementado (sección 4; filtra specs/005) |
 
 - Barra de información (`filterPanel`, 40 px, fondo #F3F4F6) bajo la botonera con el contador `counterLabel` "Mostrando X de Y". Sin filtro local: **la búsqueda se realiza desde el formulario principal** (búsqueda global, specs/004).
 
@@ -51,24 +52,25 @@ Formulario del módulo de clientes: tabla con todos los campos del cliente y bot
 ## 4. Comportamiento implementado
 
 - **Solo lectura por defecto**: la tabla no se puede reescribir; la edición pasa por Nuevo o Modificar (patrón de la skill «modificar»).
-- **Carga al abrir**: la tabla se rellena con los clientes de `Data/clients.json` (archivo inexistente = tabla vacía).
+- **Carga al abrir**: la tabla se rellena con los clientes de la base de datos `Data/crm1.db`, tabla `Clients` (primera ejecución = tabla vacía).
 - **Nuevo**: inserta una fila vacía como primera fila, la activa para edición y entra en la celda Nombre.
 - **Modificar**: activa las celdas de la **fila seleccionada** para reescribir las que se quiera (si no hay selección, aviso). Solo hay **una fila en edición a la vez**, rastreada por referencia a la fila.
 - **Cancelar**: descarta la edición en curso — una fila nueva se elimina y una modificada vuelve a los valores de la instantánea tomada al activarla — y recalcula si quedan otros cambios pendientes comparando con la última copia guardada.
 - **Eliminar** (skill «borrar»): pide confirmación Sí/No **solo con el nombre** («¿Seguro que quieres eliminar a Juan García López?») y quita la fila de la tabla. La eliminación es **en memoria**: se hace permanente al pulsar Guardar; salir sin guardar deja el archivo intacto. Actúa sobre el cliente actual (aviso si no hay selección), está inactivo durante la edición y, si la fila eliminada era la marcada, la marca se limpia.
-- **Estados de la botonera**: sin edición → Nuevo/Modificar/Eliminar/Guardar activos y Cancelar inactivo; en edición → Nuevo/Modificar/Eliminar inactivos y Cancelar activo; error de carga (catálogo o JSON) → todo inactivo. La ordenación por cabeceras se bloquea durante la edición.
+- **Estados de la botonera**: sin edición → Nuevo/Modificar/Eliminar/Tareas/Guardar activos y Cancelar inactivo; en edición → Nuevo/Modificar/Eliminar/Tareas inactivos y Cancelar activo; error de carga (catálogo o JSON) → todo inactivo. La ordenación por cabeceras se bloquea durante la edición.
 - **Filas deshabilitadas durante la edición**: mientras hay una fila activa, las demás se ven atenuadas en gris y no se pueden seleccionar (ni con clic ni con teclado: la selección y la celda actual vuelven a la fila en edición); se rehabilitan al guardar con éxito o al cancelar.
 - **Cliente actual (skill «seleccionar-cliente»)**: un clic en cualquier celda de una fila (o el teclado) la marca como cliente actual, rastreado **por identificador** (nunca por índice) y expuesto como `CurrentClient`/`CurrentClientId` para acciones futuras. Sin selección no hay cliente actual; la fila marcada se ve rodeada por un **borde grueso** (la marca visual del patrón, también en la fila en edición); si la fila marcada desaparece, la marca se limpia; tras Guardar, la marca se mantiene sobre el mismo identificador. **Modificar actúa sobre el cliente actual** (aviso si no hay ninguno marcado).
+- **Tareas** (specs/005 §7): con un cliente marcado, abre el módulo de Tareas embebido en MainForm **filtrado** a sus tareas (evento `TasksRequested` con identificador y nombre; sin acoplar formularios). Sin selección → aviso; inactivo durante la edición o con error de carga.
 - **Navegación desde la búsqueda global (specs/004)**: `IsEditing` expone si hay una edición en curso y `SelectClientById(Guid)` marca como cliente actual el indicado y desplaza la tabla hasta su fila; los usa `MainForm` al elegir un resultado de búsqueda. Con edición en curso o registro ausente, la búsqueda avisa y no navega.
 - **Contador del listado**: la barra bajo la botonera muestra cuántas filas con datos hay en la tabla ("Mostrando X de Y", siempre iguales al no haber filtro). Sin búsqueda ni filtro local: la búsqueda se hace desde el formulario principal (specs/004).
-- **Recarga al volver al módulo**: si `clients.json` cambió en disco mientras el formulario no estaba visible (p. ej. una conversión desde Futuros clientes) y aquí no hay cambios sin guardar, la tabla se recarga sola al mostrarse; si hay cambios pendientes, la recarga espera a una activación limpia. Al guardar, los registros añadidos desde fuera se conservan y la tabla se aplica sobre ellos.
+- **Recarga al volver al módulo**: si la base de datos `Data/crm1.db` cambió en disco mientras el formulario no estaba visible (p. ej. una conversión desde Futuros clientes) y aquí no hay cambios sin guardar, la tabla se recarga sola al mostrarse; si hay cambios pendientes, la recarga espera a una activación limpia. Al guardar, los registros añadidos desde fuera se conservan y la tabla se aplica sobre ellos.
 - **Guardar**:
   1. Confirma la celda en edición (`EndEdit`).
   2. Ignora las filas totalmente vacías.
   3. Normaliza lo escrito —recortes, documento en mayúsculas y sin espacios, teléfono sin espacios y **mayúsculas según las normas de la lengua**: inicial mayúscula en cada palabra de nombre, apellidos, dirección y ciudad (partículas como "de" o "la" en minúscula si no abren el texto y siglas SA/SL conservadas) y observaciones solo con la primera letra— y lo refleja en las celdas.
   4. Valida todas las filas con `ClientService` (reglas 1-10 de specs/000).
   5. Si hay errores: **no se guarda nada**; cada celda con error recibe un **borde rojo alrededor** (dibujado con `CellPainting`; las celdas permanecen siempre blancas para escribir) y el MessageBox muestra una línea por error, **solo con el mensaje corto**. El borde rojo desaparece en cuanto se corrige la celda correspondiente.
-  6. Si todo es correcto: asigna `Id` nuevo a las filas no guardadas y escribe `Data/clients.json` de forma atómica; confirma el número de clientes guardados. Un fallo de escritura se muestra como error, nunca como éxito (constitución, punto 5). Tras un guardado con éxito, todas las filas vuelven a solo lectura, las filas vacías se retiran de la vista y la edición se cierra; con errores, la edición sigue abierta (solo se cierra con un guardado correcto o con Cancelar).
+  6. Si todo es correcto: asigna `Id` nuevo a las filas no guardadas y escribe la tabla `Clients` de `Data/crm1.db` en una transacción (specs/006); confirma el número de clientes guardados. Un fallo de escritura se muestra como error, nunca como éxito (constitución, punto 5). Tras un guardado con éxito, todas las filas vuelven a solo lectura, las filas vacías se retiran de la vista y la edición se cierra; con errores, la edición sigue abierta (solo se cierra con un guardado correcto o con Cancelar).
 
 ### 4.1 Mensajes de error
 
@@ -85,7 +87,7 @@ Formulario del módulo de clientes: tabla con todos los campos del cliente y bot
 | Ciudad fuera de la provincia | La ciudad no pertenece a la provincia. |
 | Fecha de alta mal escrita | La fecha no es válida (dd/mm/aaaa). |
 | Estado no válido | El estado no es válido. |
-- **Protecciones de datos**: si no se puede cargar el catálogo de CP o `clients.json` está dañado, se muestra el error y **Guardar queda deshabilitado** (nunca se sobrescribe un archivo ilegible). Salir del formulario no modifica el archivo en ningún caso: solo Guardar escribe.
+- **Protecciones de datos**: si no se puede cargar el catálogo de CP o la base de datos `Data/crm1.db` está dañada, se muestra el error y **Guardar queda deshabilitado** (nunca se sobrescribe un almacén ilegible). Salir del formulario no modifica la base de datos en ningún caso: solo Guardar escribe.
 - **Cierre con cambios sin guardar**: al cerrar la aplicación (o pulsar Salir) con cambios sin guardar en Clientes, `MainForm` pregunta "¿Seguro que quieres salir sin guardar?" (consulta `ClientForm.HasUnsavedChanges`); si se sale, el archivo conserva los datos de la última vez que se guardó.
 
 ## 5. Pendiente

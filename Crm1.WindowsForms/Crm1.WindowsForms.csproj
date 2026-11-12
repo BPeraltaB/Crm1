@@ -15,6 +15,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Las pruebas de interfaz instancian los formularios reales y necesitan
          acceder a su costura interna de diálogos (Prompt). -->
     <InternalsVisibleTo Include="Crm1.Tests" />

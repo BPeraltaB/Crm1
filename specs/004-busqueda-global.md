@@ -18,7 +18,7 @@ Desde el menú "Búsqueda" de `MainForm`, encontrar registros por texto libre co
 
 ## 4. Coincidencia (SearchService)
 
-- Origen de los datos: **archivos guardados en disco** (`Data/clients.json` y `Data/contacts.json`), leídos en cada búsqueda. Los cambios sin Guardar no aparecen hasta guardarse.
+- Origen de los datos: **la base de datos guardada en disco** (`Data/crm1.db`, tablas `Clients` y `Contacts`, specs/006), leída en cada búsqueda. Los cambios sin Guardar no aparecen hasta guardarse.
 - Coincidencia **total o parcial** (subcadena), **sin mayúsculas/minúsculas** y **sin tildes** ("malaga" encuentra "Málaga", "GARCIA" encuentra "García").
 - Campos buscados, en el orden de las columnas de los módulos: Nombre, Primer apellido, Segundo apellido, Documento, Teléfono, Correo electrónico, Dirección, Código postal, Ciudad, Provincia, Estado (Activo/Inactivo; Pendiente/Descartado), Fecha de alta (dd/MM/aaaa; un futuro cliente sin fecha no busca por fecha) y Observaciones.
 - Un registro ocupa **una fila**. `SearchMatch` expone el registro completo (`Client`/`Contact`) para rellenar la tabla y conserva internamente los campos coincidentes (`MatchedText`), aunque la tabla no los resalte; el nombre para mostrar es nombre + apellidos no vacíos (razón social en empresas).
