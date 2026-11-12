@@ -36,6 +36,7 @@ partial class ClientForm
         this.deleteButton = new System.Windows.Forms.Button();
         this.saveButton = new System.Windows.Forms.Button();
         this.cancelButton = new System.Windows.Forms.Button();
+        this.tasksButton = new System.Windows.Forms.Button();
         this.filterPanel = new System.Windows.Forms.Panel();
         this.counterLabel = new System.Windows.Forms.Label();
         this.clientsDataGridView = new System.Windows.Forms.DataGridView();
@@ -64,6 +65,7 @@ partial class ClientForm
         this.buttonPanel.Controls.Add(this.deleteButton);
         this.buttonPanel.Controls.Add(this.saveButton);
         this.buttonPanel.Controls.Add(this.cancelButton);
+        this.buttonPanel.Controls.Add(this.tasksButton);
         this.buttonPanel.Dock = System.Windows.Forms.DockStyle.Top;
         this.buttonPanel.Location = new System.Drawing.Point(0, 0);
         this.buttonPanel.Name = "buttonPanel";
@@ -120,6 +122,16 @@ partial class ClientForm
         this.cancelButton.Text = "Cancelar";
         this.cancelButton.UseVisualStyleBackColor = true;
         this.cancelButton.Click += new System.EventHandler(this.CancelButton_Click);
+        //
+        // tasksButton
+        //
+        this.tasksButton.Location = new System.Drawing.Point(660, 12);
+        this.tasksButton.Name = "tasksButton";
+        this.tasksButton.Size = new System.Drawing.Size(120, 35);
+        this.tasksButton.TabIndex = 5;
+        this.tasksButton.Text = "Tareas";
+        this.tasksButton.UseVisualStyleBackColor = true;
+        this.tasksButton.Click += new System.EventHandler(this.TasksButton_Click);
         //
         // filterPanel
         //
@@ -273,6 +285,7 @@ partial class ClientForm
     private System.Windows.Forms.Button deleteButton;
     private System.Windows.Forms.Button saveButton;
     private System.Windows.Forms.Button cancelButton;
+    private System.Windows.Forms.Button tasksButton;
     private System.Windows.Forms.Panel filterPanel;
     private System.Windows.Forms.Label counterLabel;
     private System.Windows.Forms.DataGridView clientsDataGridView;

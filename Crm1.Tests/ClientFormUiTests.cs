@@ -235,9 +235,14 @@ public sealed class ClientFormUiTests
             Assert.Equal(2, grid.Rows.Count);
             Assert.True(form.HasUnsavedChanges);
 
+            // El contador refleja la fila retirada ya al eliminar, sin esperar
+            // a una edición (regresión del contador desfasado).
+            Assert.Equal("Mostrando 2 de 2", FormAccess.Label(form, "counterLabel").Text);
+
             FormAccess.Click(form, "SaveButton_Click");
 
             Assert.Contains("2 cliente(s)", recorder.Messages[1]);
+            Assert.Equal("Mostrando 2 de 2", FormAccess.Label(form, "counterLabel").Text);
             List<Client> saved = UiTestEnvironment.ReadClients();
             Assert.Equal(2, saved.Count);
             Assert.DoesNotContain(saved, client => client.FirstName == "Luis");
@@ -384,6 +389,54 @@ public sealed class ClientFormUiTests
             Assert.Equal("Zulema", FormAccess.CellText(grid.Rows[2], "firstNameColumn"));
             Assert.Equal("Mostrando 3 de 3", counter.Text);
             Assert.All(grid.Rows.Cast<DataGridViewRow>(), row => Assert.True(row.Visible));
+        });
+    }
+
+    // Pruebas del botón Tareas (abre el módulo filtrado, specs/005 §7).
+
+    [Fact]
+    public void Tasks_button_without_selection_shows_a_notice()
+    {
+        UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ClientForm();
+            var recorder = new PromptRecorder(DialogResult.OK);
+            form.Prompt = recorder.Answer;
+
+            FormAccess.Click(form, "TasksButton_Click");
+
+            Assert.Single(recorder.Messages);
+            Assert.Contains("Selecciona un cliente", recorder.Messages[0]);
+        });
+    }
+
+    [Fact]
+    public void Tasks_button_with_a_marked_client_raises_the_event()
+    {
+        Client ana = Fixtures.Client("Ana", "12345678Z");
+        UiTestEnvironment.WriteClients(ana);
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ClientForm();
+            form.Prompt = new PromptRecorder().Answer;
+            DataGridView grid = FormAccess.Grid(form, "clientsDataGridView");
+            grid.CurrentCell = grid.Rows[0].Cells["firstNameColumn"];
+
+            Guid? requestedId = null;
+            string? requestedName = null;
+            form.TasksRequested += (id, name) =>
+            {
+                requestedId = id;
+                requestedName = name;
+            };
+
+            FormAccess.Click(form, "TasksButton_Click");
+
+            Assert.Equal(ana.Id, requestedId);
+            Assert.Equal("Ana García Pérez", requestedName);
         });
     }
 }

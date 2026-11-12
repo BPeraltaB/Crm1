@@ -290,6 +290,39 @@ public sealed class ContactFormUiTests
         });
     }
 
+    // El botón Eliminar (skill «borrar») no tenía prueba de interfaz: se cubre
+    // aquí junto con el contador, que debe reflejar la fila retirada ya al
+    // eliminar y seguir correcto tras Guardar (sin edición abierta).
+    [Fact]
+    public void Delete_confirmed_refreshes_the_counter_and_saves()
+    {
+        UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
+        UiTestEnvironment.WriteContacts(Fixtures.Contact("Elena"), Fixtures.Contact("Iker"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ContactForm();
+            var recorder = new PromptRecorder(DialogResult.Yes, DialogResult.OK);
+            form.Prompt = recorder.Answer;
+            DataGridView grid = FormAccess.Grid(form, "contactsDataGridView");
+
+            grid.CurrentCell = grid.Rows[0].Cells["firstNameColumn"];
+            FormAccess.Click(form, "DeleteButton_Click");
+
+            Assert.Equal("CRM1 — Eliminar", recorder.Captions[0]);
+            Assert.Single(grid.Rows);
+            Assert.True(form.HasUnsavedChanges);
+
+            // El contador refleja la fila retirada ya al eliminar.
+            Assert.Equal("Mostrando 1 de 1", FormAccess.Label(form, "counterLabel").Text);
+
+            FormAccess.Click(form, "SaveButton_Click");
+
+            Assert.Equal("Mostrando 1 de 1", FormAccess.Label(form, "counterLabel").Text);
+            Assert.Single(UiTestEnvironment.ReadContacts());
+        });
+    }
+
     // Navegación usada por la búsqueda global (specs/004) sobre este módulo.
     [Fact]
     public void SelectContactById_marks_the_contact_as_current()
@@ -306,6 +339,56 @@ public sealed class ContactFormUiTests
             Assert.True(form.SelectContactById(elena.Id));
             Assert.Equal(elena.Id, form.CurrentContactId);
             Assert.False(form.SelectContactById(Guid.NewGuid()));
+        });
+    }
+
+    // Pruebas del botón Tareas (abre el módulo filtrado, specs/005 §7).
+
+    [Fact]
+    public void Tasks_button_without_selection_shows_a_notice()
+    {
+        UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
+        UiTestEnvironment.WriteContacts(Fixtures.Contact("Elena"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ContactForm();
+            var recorder = new PromptRecorder(DialogResult.OK);
+            form.Prompt = recorder.Answer;
+
+            FormAccess.Click(form, "TasksButton_Click");
+
+            Assert.Single(recorder.Messages);
+            Assert.Contains("Selecciona un futuro cliente", recorder.Messages[0]);
+        });
+    }
+
+    [Fact]
+    public void Tasks_button_with_a_marked_contact_raises_the_event()
+    {
+        Contact elena = Fixtures.Contact("Elena");
+        UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
+        UiTestEnvironment.WriteContacts(elena);
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ContactForm();
+            form.Prompt = new PromptRecorder().Answer;
+            DataGridView grid = FormAccess.Grid(form, "contactsDataGridView");
+            grid.CurrentCell = grid.Rows[0].Cells["firstNameColumn"];
+
+            Guid? requestedId = null;
+            string? requestedName = null;
+            form.TasksRequested += (id, name) =>
+            {
+                requestedId = id;
+                requestedName = name;
+            };
+
+            FormAccess.Click(form, "TasksButton_Click");
+
+            Assert.Equal(elena.Id, requestedId);
+            Assert.Equal("Elena", requestedName);
         });
     }
 }
