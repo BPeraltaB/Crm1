@@ -56,7 +56,7 @@ public partial class ClientForm : System.Windows.Forms.Form
     // Ruta y sello temporal del archivo de clientes: detecta cambios hechos
     // desde fuera (p. ej. conversiones de futuros clientes) para recargar o
     // fusionar al guardar sin perder esos registros (constitución, punto 5).
-    private readonly string _clientsFilePath = Path.Combine(AppContext.BaseDirectory, "Data", "clients.json");
+    private readonly string _databaseFilePath = Path.Combine(AppContext.BaseDirectory, "Data", "crm1.db");
     private DateTime _lastClientsFileStamp;
 
     // Clientes guardados en disco que esta tabla no muestra (añadidos desde
@@ -76,6 +76,13 @@ public partial class ClientForm : System.Windows.Forms.Form
     /// delegado que responde sin bloquear.
     /// </summary>
     internal Func<string, string, MessageBoxButtons, MessageBoxIcon, DialogResult> Prompt { get; set; }
+
+    /// <summary>
+    /// Solicita abrir el módulo de Tareas filtrado al cliente marcado
+    /// (specs/005 §7). Lo atiende MainForm; mismo patrón que la navegación
+    /// de la búsqueda global.
+    /// </summary>
+    public event Action<Guid, string>? TasksRequested;
 
     // Cliente actual marcado por el usuario (skill «seleccionar-cliente»):
     // rastreo por identificador, nunca por índice.
@@ -157,7 +164,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         _clientService = catalog is null ? null : new ClientService(catalog);
         _canSave = _clientService is not null;
 
-        _dataStore = new JsonDataStore();
+        _dataStore = new SqlDataStore();
 
         if (_catalog is not null)
         {
@@ -195,6 +202,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         modifyButton.Enabled = _canSave && !editing;
         saveButton.Enabled = _canSave;
         cancelButton.Enabled = _canSave && editing;
+        tasksButton.Enabled = _canSave && !editing;
     }
 
     /// <summary>
@@ -294,7 +302,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         catch (Exception ex)
         {
             Prompt(
-                "No se pudo leer el archivo de clientes (Data/clients.json).\n\n" +
+                "No se pudo leer la base de datos de clientes (Data/crm1.db).\n\n" +
                 "Los botones de gestión se han desactivado para no sobrescribir los datos.\n\n" +
                 ex.Message,
                 "CRM1 — Error de datos",
@@ -324,14 +332,14 @@ public partial class ClientForm : System.Windows.Forms.Form
     }
 
     /// <summary>
-    /// Sello temporal del archivo de clientes: cambia cuando alguien más lo
-    /// escribe (por ejemplo, una conversión desde Futuros clientes).
+    /// Sello temporal de la base de datos: cambia cuando alguien más la escribe
+    /// (por ejemplo, una conversión desde Futuros clientes).
     /// </summary>
     private DateTime GetClientsFileStamp() =>
-        File.Exists(_clientsFilePath) ? File.GetLastWriteTimeUtc(_clientsFilePath) : DateTime.MinValue;
+        File.Exists(_databaseFilePath) ? File.GetLastWriteTimeUtc(_databaseFilePath) : DateTime.MinValue;
 
     /// <summary>
-    /// Al volver a mostrar el módulo, recarga los clientes si el archivo cambió
+    /// Al volver a mostrar el módulo, recarga los clientes si la base de datos cambió
     /// en disco y aquí no hay nada pendiente; así aparecen las altas hechas
     /// desde fuera (conversiones) sin tocar MainForm (specs/002).
     /// </summary>
@@ -494,6 +502,37 @@ public partial class ClientForm : System.Windows.Forms.Form
 
         // Queda un cambio sin guardar pendiente de Guardar.
         _dirty = true;
+
+        // El contador debe reflejar la fila retirada también sin edición
+        // abierta (EndEditingSession vuelve pronto si no hay sesión); igual
+        // que ContactForm y TaskForm.
+        UpdateCounter();
+    }
+
+    /// <summary>
+    /// Abre el módulo de Tareas filtrado al cliente marcado: lanza el evento
+    /// que atiende MainForm (specs/005 §7). Sin selección, aviso.
+    /// </summary>
+    private void TasksButton_Click(object? sender, EventArgs e)
+    {
+        if (!_canSave || _activeRow is not null)
+        {
+            return;
+        }
+
+        // Cliente actual marcado con un clic en cualquier celda de su fila
+        // (skill «seleccionar-cliente»).
+        System.Windows.Forms.DataGridViewRow? row = FindRowById(_currentClientId);
+        if (row is null)
+        {
+            Prompt(
+                "Selecciona un cliente de la tabla.",
+                "CRM1 — Tareas",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        TasksRequested?.Invoke(_currentClientId!.Value, RowDisplayName(row));
     }
 
     /// <summary>
@@ -677,6 +716,10 @@ public partial class ClientForm : System.Windows.Forms.Form
         RemoveEmptyRows();
         EndEditingSession();
         EnsureCurrentClientExists();
+
+        // Sin sesión de edición (p. ej. solo se eliminó una fila),
+        // EndEditingSession vuelve pronto: el contador se refresca aquí.
+        UpdateCounter();
 
         Prompt(
             $"Se han guardado {clients.Count} cliente(s) correctamente.",

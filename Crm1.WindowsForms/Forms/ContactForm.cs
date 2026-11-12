@@ -32,8 +32,8 @@ public partial class ContactForm : System.Windows.Forms.Form
     private readonly PostalCodeCatalog? _catalog;
     private readonly ContactService? _contactService;
 
-    // Falso si el catálogo de CP, clients.json o contacts.json no se pudieron
-    // cargar: todos los botones de gestión quedan inactivos (constitución, punto 5).
+    // Falso si el catálogo de CP o la base de datos no se pudieron cargar:
+    // todos los botones de gestión quedan inactivos (constitución, punto 5).
     private bool _canSave;
 
     // Fila activa para edición (rastreada por referencia); null si no hay sesión.
@@ -71,6 +71,13 @@ public partial class ContactForm : System.Windows.Forms.Form
     /// antes de cerrar la aplicación porque ContactForm va embebido (specs/003).
     /// </summary>
     public bool HasUnsavedChanges => _dirty;
+
+    /// <summary>
+    /// Solicita abrir el módulo de Tareas filtrado al futuro cliente marcado
+    /// (specs/005 §7). Lo atiende MainForm; mismo patrón que la navegación
+    /// de la búsqueda global.
+    /// </summary>
+    public event Action<Guid, string>? TasksRequested;
 
     /// <summary>
     /// Diálogos del formulario (avisos, confirmaciones y errores): todo pasa
@@ -158,7 +165,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
 
         _catalog = catalog;
-        _dataStore = new JsonDataStore();
+        _dataStore = new SqlDataStore();
 
         // Documentos de los clientes guardados: un documento de cliente no puede
         // registrarse como futuro cliente. Si el archivo no se puede leer, no se
@@ -173,7 +180,7 @@ public partial class ContactForm : System.Windows.Forms.Form
             catch (Exception ex)
             {
                 Prompt(
-                    "No se pudo leer el archivo de clientes (Data/clients.json), necesario para\n" +
+                    "No se pudo leer la base de datos de clientes (Data/crm1.db), necesaria para\n" +
                     "comprobar que un documento de un cliente no se usa como futuro cliente.\n\n" +
                     "Los botones de gestión se han desactivado para no omitir la comprobación.\n\n" +
                     ex.Message,
@@ -221,6 +228,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         saveButton.Enabled = _canSave;
         cancelButton.Enabled = _canSave && editing;
         convertButton.Enabled = _canSave && !editing;
+        tasksButton.Enabled = _canSave && !editing;
     }
 
     /// <summary>
@@ -321,7 +329,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         catch (Exception ex)
         {
             Prompt(
-                "No se pudo leer el archivo de futuros clientes (Data/contacts.json).\n\n" +
+                "No se pudo leer la base de datos de futuros clientes (Data/crm1.db).\n\n" +
                 "Los botones de gestión se han desactivado para no sobrescribir los datos.\n\n" +
                 ex.Message,
                 "CRM1 — Error de datos",
@@ -507,6 +515,11 @@ public partial class ContactForm : System.Windows.Forms.Form
 
         // Queda un cambio sin guardar pendiente de Guardar.
         _dirty = true;
+
+        // El contador debe reflejar la fila retirada también sin edición
+        // abierta (EndEditingSession vuelve pronto si no hay sesión); igual
+        // que ClientForm y TaskForm.
+        UpdateCounter();
     }
 
     /// <summary>
@@ -524,6 +537,32 @@ public partial class ContactForm : System.Windows.Forms.Form
             }.Where(part => part.Length > 0));
 
         return name.Length > 0 ? name : "este futuro cliente";
+    }
+
+    /// <summary>
+    /// Abre el módulo de Tareas filtrado al futuro cliente marcado: lanza el
+    /// evento que atiende MainForm (specs/005 §7). Sin selección, aviso.
+    /// </summary>
+    private void TasksButton_Click(object? sender, EventArgs e)
+    {
+        if (!_canSave || _activeRow is not null)
+        {
+            return;
+        }
+
+        // Futuro cliente actual marcado con un clic en cualquier celda de su
+        // fila (skill «seleccionar-cliente»).
+        System.Windows.Forms.DataGridViewRow? row = FindRowById(_currentContactId);
+        if (row is null)
+        {
+            Prompt(
+                "Selecciona un futuro cliente de la tabla.",
+                "CRM1 — Tareas",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        TasksRequested?.Invoke(_currentContactId!.Value, RowDisplayName(row));
     }
 
     /// <summary>
@@ -815,6 +854,10 @@ public partial class ContactForm : System.Windows.Forms.Form
         RemoveEmptyRows();
         EndEditingSession();
         EnsureCurrentContactExists();
+
+        // Sin sesión de edición (p. ej. solo se eliminó una fila),
+        // EndEditingSession vuelve pronto: el contador se refresca aquí.
+        UpdateCounter();
 
         Prompt(
             convertedCount > 0
