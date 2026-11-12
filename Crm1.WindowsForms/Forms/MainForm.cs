@@ -11,6 +11,7 @@ public partial class MainForm : System.Windows.Forms.Form
     private ClientForm? clientForm;
     private ContactForm? contactForm;
     private SearchForm? searchForm;
+    private TaskForm? taskForm;
 
     public MainForm()
     {
@@ -29,8 +30,15 @@ public partial class MainForm : System.Windows.Forms.Form
     /// </summary>
     private void ClientsMenuItem_Click(object? sender, EventArgs e)
     {
-        // Crea el formulario de clientes una sola vez.
-        clientForm ??= new ClientForm();
+        // Crea el formulario de clientes una sola vez y atiende su botón
+        // Tareas: abre el módulo de tareas filtrado al cliente marcado.
+        if (clientForm is null)
+        {
+            clientForm = new ClientForm();
+            clientForm.TasksRequested += (id, name) =>
+                ShowFilteredTasks(Crm1.WindowsForms.Models.TaskRelatedType.Client, id, name);
+        }
+
         ShowModule(clientForm);
     }
 
@@ -39,9 +47,39 @@ public partial class MainForm : System.Windows.Forms.Form
     /// </summary>
     private void ProspectsMenuItem_Click(object? sender, EventArgs e)
     {
-        // Crea el formulario de futuros clientes una sola vez.
-        contactForm ??= new ContactForm();
+        // Crea el formulario una sola vez y atiende su botón Tareas: abre el
+        // módulo de tareas filtrado al futuro cliente marcado.
+        if (contactForm is null)
+        {
+            contactForm = new ContactForm();
+            contactForm.TasksRequested += (id, name) =>
+                ShowFilteredTasks(Crm1.WindowsForms.Models.TaskRelatedType.Prospect, id, name);
+        }
+
         ShowModule(contactForm);
+    }
+
+    /// <summary>
+    /// Muestra el formulario de tareas embebido en el área central. Desde el
+    /// menú siempre se ven todas (sin filtro).
+    /// </summary>
+    private void TasksMenuItem_Click(object? sender, EventArgs e)
+    {
+        // Crea el formulario de tareas una sola vez.
+        taskForm ??= new TaskForm();
+        taskForm.ShowAllTasks();
+        ShowModule(taskForm);
+    }
+
+    /// <summary>
+    /// Muestra el módulo de Tareas filtrado al cliente o futuro cliente
+    /// indicado (botón Tareas de ClientForm/ContactForm, specs/005 §7).
+    /// </summary>
+    private void ShowFilteredTasks(Crm1.WindowsForms.Models.TaskRelatedType relatedType, Guid relatedId, string displayName)
+    {
+        taskForm ??= new TaskForm();
+        taskForm.ShowTasksOf(relatedType, relatedId, displayName);
+        ShowModule(taskForm);
     }
 
     /// <summary>
@@ -135,9 +173,9 @@ public partial class MainForm : System.Windows.Forms.Form
     }
 
     /// <summary>
-    /// Pregunta antes de cerrar la aplicación si algún módulo embebido (Clientes
-    /// o Futuros clientes) tiene cambios sin guardar (protección de specs/002
-    /// y specs/003, sección de cierre).
+    /// Pregunta antes de cerrar la aplicación si algún módulo embebido (Clientes,
+    /// Futuros clientes o Tareas) tiene cambios sin guardar (protección de
+    /// specs/002, specs/003 y specs/005, sección de cierre).
     /// </summary>
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
@@ -152,6 +190,10 @@ public partial class MainForm : System.Windows.Forms.Form
         if (contactForm?.HasUnsavedChanges == true)
         {
             unsavedModules.Add("Futuros clientes");
+        }
+        if (taskForm?.HasUnsavedChanges == true)
+        {
+            unsavedModules.Add("Tareas");
         }
 
         if (e.Cancel || unsavedModules.Count == 0)

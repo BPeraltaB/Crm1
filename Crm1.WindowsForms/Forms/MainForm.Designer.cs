@@ -37,6 +37,7 @@ partial class MainForm
         this.clientsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.searchMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.prospectsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+        this.tasksMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.bottomSeparator = new System.Windows.Forms.ToolStripSeparator();
         this.exitMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.panelContent = new System.Windows.Forms.Panel();
@@ -63,6 +64,7 @@ partial class MainForm
             this.clientsMenuItem,
             this.searchMenuItem,
             this.prospectsMenuItem,
+            this.tasksMenuItem,
             this.bottomSeparator,
             this.exitMenuItem});
         this.menuStrip.LayoutStyle = System.Windows.Forms.ToolStripLayoutStyle.VerticalStackWithOverflow;
@@ -115,6 +117,17 @@ partial class MainForm
         this.prospectsMenuItem.Text = "Futuros clientes";
         this.prospectsMenuItem.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
         this.prospectsMenuItem.Click += new System.EventHandler(this.ProspectsMenuItem_Click);
+        // 
+        // tasksMenuItem
+        // 
+        this.tasksMenuItem.AutoSize = false;
+        this.tasksMenuItem.ForeColor = System.Drawing.Color.FromArgb(226, 232, 240);
+        this.tasksMenuItem.Margin = new System.Windows.Forms.Padding(4, 1, 4, 1);
+        this.tasksMenuItem.Padding = new System.Windows.Forms.Padding(8, 0, 0, 0);
+        this.tasksMenuItem.Size = new System.Drawing.Size(212, 40);
+        this.tasksMenuItem.Text = "Tareas";
+        this.tasksMenuItem.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.tasksMenuItem.Click += new System.EventHandler(this.TasksMenuItem_Click);
         // 
         // bottomSeparator
         // 
@@ -198,6 +211,7 @@ partial class MainForm
     private System.Windows.Forms.ToolStripMenuItem clientsMenuItem;
     private System.Windows.Forms.ToolStripMenuItem searchMenuItem;
     private System.Windows.Forms.ToolStripMenuItem prospectsMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem tasksMenuItem;
     private System.Windows.Forms.ToolStripSeparator bottomSeparator;
     private System.Windows.Forms.ToolStripMenuItem exitMenuItem;
     private System.Windows.Forms.Panel panelContent;
