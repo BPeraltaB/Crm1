@@ -80,6 +80,7 @@ public sealed class SqlDataStoreTests : IDisposable
         Assert.Empty(store.LoadClients());
         Assert.Empty(store.LoadContacts());
         Assert.Empty(store.LoadTasks());
+        Assert.Empty(store.LoadReminders());
     }
 
     [Fact]
@@ -184,6 +185,57 @@ public sealed class SqlDataStoreTests : IDisposable
         Assert.Empty(store.LoadTasks());
         Assert.Single(new SqlDataStore(DatabasePath, LegacyStore).LoadClients());
         Assert.Single(new SqlDataStore(DatabasePath, LegacyStore).LoadContacts());
+    }
+
+    private static Reminder SampleReminder(TaskRelatedType relatedType = TaskRelatedType.Client,
+        ReminderStatus status = ReminderStatus.Active) => new()
+    {
+        Id = Guid.Parse("99999999-8888-7777-6666-555555555555"),
+        Subject = "Llamada de seguimiento del presupuesto",
+        RemindAt = new DateTime(2026, 11, 20, 10, 30, 0),
+        Status = status,
+        RelatedId = Guid.Parse("01234567-89ab-cdef-0123-456789abcdef"),
+        RelatedType = relatedType
+    };
+
+    [Fact]
+    public void Reminders_roundtrip_preserves_all_fields()
+    {
+        SqlDataStore store = new(DatabasePath, LegacyStore);
+        Reminder prospectReminder = SampleReminder(TaskRelatedType.Prospect, ReminderStatus.Dismissed);
+        prospectReminder.Id = Guid.Parse("aaaaaaa1-bbbb-cccc-dddd-eeeeeeeeeeee");
+        store.SaveReminders(new List<Reminder> { SampleReminder(), prospectReminder });
+
+        List<Reminder> loaded = new SqlDataStore(DatabasePath, LegacyStore).LoadReminders();
+
+        Assert.Equal(2, loaded.Count);
+        Reminder reminder = loaded[0];
+        Assert.Equal(SampleReminder().Id, reminder.Id);
+        Assert.Equal("Llamada de seguimiento del presupuesto", reminder.Subject);
+        Assert.Equal(new DateTime(2026, 11, 20, 10, 30, 0), reminder.RemindAt);
+        Assert.Equal(ReminderStatus.Active, reminder.Status);
+        Assert.Equal(SampleReminder().RelatedId, reminder.RelatedId);
+        Assert.Equal(TaskRelatedType.Client, reminder.RelatedType);
+        Assert.Equal(TaskRelatedType.Prospect, loaded[1].RelatedType);
+        Assert.Equal(ReminderStatus.Dismissed, loaded[1].Status);
+    }
+
+    [Fact]
+    public void Saving_reminders_does_not_touch_other_tables()
+    {
+        SqlDataStore store = new(DatabasePath, LegacyStore);
+        store.SaveClients(new List<Client> { SampleClient() });
+        store.SaveContacts(new List<Contact> { SampleContact() });
+        store.SaveTasks(new List<Task> { SampleTask() });
+        store.SaveReminders(new List<Reminder> { SampleReminder() });
+
+        // Guardar de nuevo los recordatorios (vacíos) no altera las demás tablas.
+        store.SaveReminders(new List<Reminder>());
+
+        Assert.Empty(store.LoadReminders());
+        Assert.Single(new SqlDataStore(DatabasePath, LegacyStore).LoadClients());
+        Assert.Single(new SqlDataStore(DatabasePath, LegacyStore).LoadContacts());
+        Assert.Single(new SqlDataStore(DatabasePath, LegacyStore).LoadTasks());
     }
 
     [Fact]

@@ -8,9 +8,10 @@ namespace Crm1.WindowsForms.Services;
 
 /// <summary>
 /// Almacenamiento SQL local (SQLite): base de datos Data/crm1.db junto al
-/// ejecutable, con tablas Clients, Contacts y Tasks independientes (specs/006
-/// y specs/005). Al abrirse por primera vez migra los antiguos JSON (una sola
-/// vez, sin borrarlos) y queda como almacén activo de la aplicación.
+/// ejecutable, con tablas Clients, Contacts, Tasks y Reminders independientes
+/// (specs/006, specs/005 y specs/007). Al abrirse por primera vez migra los
+/// antiguos JSON (una sola vez, sin borrarlos) y queda como almacén activo de
+/// la aplicación.
 /// </summary>
 public sealed class SqlDataStore : IDataStore
 {
@@ -159,6 +160,15 @@ public sealed class SqlDataStore : IDataStore
                         RelatedType TEXT NOT NULL
                     );
 
+                    CREATE TABLE IF NOT EXISTS Reminders (
+                        Id TEXT PRIMARY KEY,
+                        Subject TEXT NOT NULL,
+                        RemindAt TEXT NOT NULL,
+                        Status TEXT NOT NULL,
+                        RelatedId TEXT NOT NULL,
+                        RelatedType TEXT NOT NULL
+                    );
+
                     CREATE TABLE IF NOT EXISTS SchemaInfo (
                         Key TEXT PRIMARY KEY,
                         Value TEXT NOT NULL
@@ -250,6 +260,51 @@ public sealed class SqlDataStore : IDataStore
             foreach (Task task in tasks)
             {
                 InsertTaskRow(connection, transaction, task);
+            }
+            transaction.Commit();
+            return null;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    });
+
+    /// <summary>
+    /// Carga los recordatorios guardados (specs/007). Una base sin
+    /// recordatorios devuelve una lista vacía; una base ilegible lanza una
+    /// excepción visible (constitución, punto 5).
+    /// </summary>
+    public List<Reminder> LoadReminders() => Execute(connection =>
+    {
+        EnsureSchemaAndMigrate(connection);
+        var reminders = new List<Reminder>();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id, Subject, RemindAt, Status, RelatedId, RelatedType FROM Reminders";
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            reminders.Add(MapReminder(reader));
+        }
+        return reminders;
+    });
+
+    /// <summary>
+    /// Guarda los recordatorios reemplazando el contenido de la tabla
+    /// Reminders en una transacción (specs/007 y specs/006). La tabla es
+    /// independiente de las demás.
+    /// </summary>
+    public void SaveReminders(List<Reminder> reminders) => Execute<object?>(connection =>
+    {
+        EnsureSchemaAndMigrate(connection);
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        try
+        {
+            ExecuteNonQuery(connection, transaction, "DELETE FROM Reminders");
+            foreach (Reminder reminder in reminders)
+            {
+                InsertReminderRow(connection, transaction, reminder);
             }
             transaction.Commit();
             return null;
@@ -355,6 +410,18 @@ public sealed class SqlDataStore : IDataStore
         RelatedType = Enum.Parse<TaskRelatedType>(Text(reader, 7))
     };
 
+    // Convierte una fila de la tabla Reminders (specs/007): los enums viajan
+    // como los nombres de sus valores, escritos siempre por esta misma clase.
+    private static Reminder MapReminder(SqliteDataReader reader) => new()
+    {
+        Id = Guid.Parse(Text(reader, 0)),
+        Subject = Text(reader, 1),
+        RemindAt = ParseDateTime(Text(reader, 2)),
+        Status = Enum.Parse<ReminderStatus>(Text(reader, 3)),
+        RelatedId = Guid.Parse(Text(reader, 4)),
+        RelatedType = Enum.Parse<TaskRelatedType>(Text(reader, 5))
+    };
+
     // Inserta una fila parametrizada en la tabla indicada.
     private static void InsertRow(SqliteConnection connection, SqliteTransaction transaction, string table,
         Guid id, string firstName, string lastName1, string lastName2, string taxId, string phone, string email,
@@ -404,6 +471,25 @@ public sealed class SqlDataStore : IDataStore
         command.ExecuteNonQuery();
     }
 
+    // Inserta una fila parametrizada de la tabla Reminders (specs/007). Los
+    // enums se guardan como el nombre de su valor, igual que en las demás
+    // tablas; la fecha y hora viaja en ISO con la hora.
+    private static void InsertReminderRow(SqliteConnection connection, SqliteTransaction transaction, Reminder reminder)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            "INSERT INTO Reminders (Id, Subject, RemindAt, Status, RelatedId, RelatedType) " +
+            "VALUES (@id, @subject, @remindAt, @status, @relatedId, @relatedType)";
+        command.Parameters.AddWithValue("@id", reminder.Id.ToString());
+        command.Parameters.AddWithValue("@subject", reminder.Subject ?? string.Empty);
+        command.Parameters.AddWithValue("@remindAt", FormatDateTime(reminder.RemindAt));
+        command.Parameters.AddWithValue("@status", reminder.Status.ToString());
+        command.Parameters.AddWithValue("@relatedId", reminder.RelatedId.ToString());
+        command.Parameters.AddWithValue("@relatedType", reminder.RelatedType.ToString());
+        command.ExecuteNonQuery();
+    }
+
     private static void ExecuteNonQuery(SqliteConnection connection, SqliteTransaction? transaction, string commandText)
     {
         using var command = connection.CreateCommand();
@@ -449,6 +535,14 @@ public sealed class SqlDataStore : IDataStore
 
     private static DateTime ParseDate(string value) =>
         value.Length == 0 ? default : DateTime.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None);
+
+    // Las fechas con hora (recordatorios, specs/007) van en ISO
+    // yyyy-MM-dd HH:mm:ss; la cadena vacía significa «sin fecha».
+    private static string FormatDateTime(DateTime date) =>
+        date == default ? string.Empty : date.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+
+    private static DateTime ParseDateTime(string value) =>
+        value.Length == 0 ? default : DateTime.ParseExact(value, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None);
 
     private static string Text(SqliteDataReader reader, int ordinal) =>
         reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);

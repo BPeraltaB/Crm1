@@ -94,6 +94,20 @@ internal static class UiTestEnvironment
     public static List<Task> ReadTasks() => Store.LoadTasks();
 
     /// <summary>
+    /// Siembra el escenario de recordatorios escribiendo directamente en la
+    /// base de datos (los recordatorios no tienen JSON: specs/007 y specs/006).
+    /// Reemplaza la tabla Reminders por completo; el resto de tablas queda
+    /// intacto.
+    /// </summary>
+    public static void WriteReminders(params Reminder[] reminders)
+    {
+        Directory.CreateDirectory(DataDirectory);
+        Store.SaveReminders(reminders.ToList());
+    }
+
+    public static List<Reminder> ReadReminders() => Store.LoadReminders();
+
+    /// <summary>
     /// Fuerza un sello temporal distinto en la base de datos para simular que
     /// otro módulo la ha escrito mientras el formulario estaba abierto (la
     /// detección de cambios externos compara sellos temporales). Si la base
