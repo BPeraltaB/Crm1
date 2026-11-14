@@ -6,14 +6,25 @@ namespace Crm1.WindowsForms.Forms;
 /// Columna de fecha con calendario (specs/005, sección 3): al editar la celda
 /// se despliega un DateTimePicker donde se elige el día, con las flechas de
 /// mes y año. La celda guarda la fecha como texto dd/MM/aaaa, igual que las
-/// fechas de los demás módulos.
+/// fechas de los demás módulos. Admite un formato propio para columnas con
+/// hora (recordatorios, specs/007: dd/MM/aaaa HH:mm).
 /// </summary>
 public class CalendarColumn : System.Windows.Forms.DataGridViewColumn
 {
     /// <summary>
-    /// Crea la columna con una celda de calendario como plantilla.
+    /// Crea la columna con el formato de fecha español (dd/MM/aaaa). Necesario
+    /// explícito: el clonado interno de columnas y el diseñador usan
+    /// Activator.CreateInstance, que exige constructor sin parámetros.
     /// </summary>
-    public CalendarColumn() : base(new CalendarCell())
+    public CalendarColumn() : this("dd/MM/yyyy")
+    {
+    }
+
+    /// <summary>
+    /// Crea la columna con una celda de calendario como plantilla y el
+    /// formato indicado (con hora en recordatorios, specs/007).
+    /// </summary>
+    public CalendarColumn(string format) : base(new CalendarCell(format))
     {
     }
 
@@ -35,44 +46,85 @@ public class CalendarColumn : System.Windows.Forms.DataGridViewColumn
 /// </summary>
 public class CalendarCell : System.Windows.Forms.DataGridViewTextBoxCell
 {
+    // Formato de la celda (dd/MM/aaaa por defecto; con hora en recordatorios).
+    // Mutable: el clonado de celdas lo copia en Clone().
+    private string _format;
+
     /// <summary>
-    /// Crea la celda con el formato de fecha español de los demás módulos.
+    /// Crea la celda con el formato de fecha español (dd/MM/aaaa).
     /// </summary>
-    public CalendarCell()
+    public CalendarCell() : this("dd/MM/yyyy")
     {
-        Style.Format = "dd/MM/yyyy";
     }
 
     /// <summary>
-    /// Al entrar a editar, el calendario parte de la fecha de la celda (o de
-    /// hoy si está vacía o no se puede leer).
+    /// Crea la celda con el formato indicado (con hora en recordatorios).
+    /// </summary>
+    public CalendarCell(string format)
+    {
+        _format = format;
+        Style.Format = _format;
+    }
+
+    /// <summary>
+    /// Copia el formato al clonar la celda. Obligatorio: el clonado estándar
+    /// crea la celda con el constructor sin parámetros (formato dd/MM/aaaa)
+    /// y el estado propio se perdería — la fila editaría con el calendario
+    /// simple aunque su columna tenga formato con hora (requisito documentado
+    /// de WinForms para celdas con estado propio).
+    /// </summary>
+    public override object Clone()
+    {
+        CalendarCell clone = (CalendarCell)base.Clone();
+        clone._format = _format;
+        clone.Style.Format = _format;
+        return clone;
+    }
+
+    /// <summary>
+    /// Al entrar a editar, el control parte de la fecha de la celda (o de hoy
+    /// si está vacía o no se puede leer). Con formato de solo fecha usa el
+    /// calendario simple; con hora, el control combinado día + hora.
     /// </summary>
     public override void InitializeEditingControl(int rowIndex, object? initialFormattedValue,
         System.Windows.Forms.DataGridViewCellStyle cellStyle)
     {
         base.InitializeEditingControl(rowIndex, initialFormattedValue, cellStyle);
-        if (DataGridView?.EditingControl is CalendarEditingControl control)
+        DateTime date = DateTime.TryParseExact(
+            Value?.ToString(),
+            _format,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out DateTime parsed)
+            ? parsed
+            : DateTime.Today;
+
+        if (DataGridView?.EditingControl is DateTimeEditingControl dateTimeControl)
         {
-            control.Value = DateTime.TryParseExact(
-                Value?.ToString(),
-                "dd/MM/yyyy",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out DateTime date)
-                ? date
-                : DateTime.Today;
+            dateTimeControl.Value = date;
+        }
+        else if (DataGridView?.EditingControl is CalendarEditingControl control)
+        {
+            control.CustomFormat = _format;
+            control.Value = date;
         }
     }
 
-    /// <summary>Control de edición: el calendario.</summary>
-    public override Type EditType => typeof(CalendarEditingControl);
+    /// <summary>
+    /// Control de edición: el calendario simple con formato de solo fecha
+    /// (tareas) o el combinado día + hora con cualquier otro formato
+    /// (recordatorios).
+    /// </summary>
+    public override Type EditType => _format == "dd/MM/yyyy"
+        ? typeof(CalendarEditingControl)
+        : typeof(DateTimeEditingControl);
 
-    /// <summary>Las celdas guardan la fecha como texto dd/MM/aaaa.</summary>
+    /// <summary>Las celdas guardan la fecha como texto con su formato.</summary>
     public override Type ValueType => typeof(string);
 
     /// <summary>Valor inicial de una celda nueva: hoy.</summary>
     public override object DefaultNewRowValue =>
-        DateTime.Today.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        DateTime.Today.ToString(_format, CultureInfo.InvariantCulture);
 
     /// <summary>
     /// El control de edición ya entrega el texto en dd/MM/aaaa; se guarda tal cual.
@@ -106,13 +158,13 @@ internal class CalendarEditingControl : System.Windows.Forms.DateTimePicker,
         CustomFormat = "dd/MM/yyyy";
     }
 
-    /// <summary>Fecha de la celda en dd/MM/aaaa.</summary>
+    /// <summary>Fecha de la celda con el formato propio del control (el de su columna).</summary>
     public object EditingControlFormattedValue
     {
-        get => Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        get => Value.ToString(CustomFormat, CultureInfo.InvariantCulture);
         set => Value = DateTime.TryParseExact(
             value?.ToString(),
-            "dd/MM/yyyy",
+            CustomFormat,
             CultureInfo.InvariantCulture,
             DateTimeStyles.None,
             out DateTime date)
