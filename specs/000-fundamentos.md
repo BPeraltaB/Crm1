@@ -17,10 +17,10 @@ Primera versión funcional de CRM1 centrada en el módulo de Clientes: alta, edi
 
 - La aplicación inicia con el formulario principal `MainForm` (clase parcial `Crm1.WindowsForms.Forms.MainForm`), dividido en `Crm1.WindowsForms/Forms/MainForm.cs` y `Forms/MainForm.Designer.cs` para poder editarlo con el diseñador de Visual Studio. La clase no se llama `Form` a propósito: colisiona con `System.Windows.Forms.Form` y el diseñador de VS no la cargaría.
 - Diseño: ventana de 1200×750 (mínimo 900×600), título "CRM1", centrada en pantalla.
-  - Menú lateral (`MenuStrip` vertical, 220 px, tema oscuro #2D3748 con renderer propio) con: título "CRM1", Clientes, Búsqueda, Futuros clientes, Tareas y Salir. Salir cierra la aplicación; Clientes muestra `ClientForm`, Futuros clientes muestra `ContactForm`, Búsqueda muestra `SearchForm` (specs/004-busqueda-global.md) y Tareas muestra `TaskForm` (specs/005-tareas.md, por ahora solo diseño, sin datos), embebidos en el área central (`panelContent`) de MainForm — **implementados**.
+  - Menú lateral (`MenuStrip` vertical, 220 px, tema oscuro #2D3748 con renderer propio) con: título "CRM1", Clientes, Búsqueda, Futuros clientes, Tareas, Recordatorios y Salir. Salir cierra la aplicación; Clientes muestra `ClientForm`, Futuros clientes muestra `ContactForm`, Búsqueda muestra `SearchForm` (specs/004-busqueda-global.md), Tareas muestra `TaskForm` (specs/005-tareas.md) y Recordatorios muestra `ReminderForm` (specs/007-recordatorios.md), embebidos en el área central (`panelContent`) de MainForm — **implementados**.
   - Área central clara (#F3F4F6) vacía, reservada para el contenido de los módulos futuros.
   - Barra de estado inferior blanca con "CRM1 — v0.1" y fecha/hora actualizada cada 30 segundos.
-- "Futuros clientes" es el módulo de seguimiento previo a ser cliente: `ContactForm`, especificado e implementado en specs/003-formulario-futuros-clientes.md. El módulo "Contactos" original (personas de contacto de cada cliente) queda por decidir; "Tareas" abre `TaskForm` (solo diseño, specs/005-tareas.md) y el resto de módulos del diseño general (oportunidades, recordatorios, etc.) se ubicarán en otro formulario en el futuro, no en este menú.
+- "Futuros clientes" es el módulo de seguimiento previo a ser cliente: `ContactForm`, especificado e implementado en specs/003-formulario-futuros-clientes.md. El módulo "Contactos" original (personas de contacto de cada cliente) queda por decidir; "Tareas" abre `TaskForm` (specs/005-tareas.md) y "Recordatorios" abre `ReminderForm` (specs/007-recordatorios.md); el resto de módulos del diseño general (oportunidades, etc.) se ubicarán en otro formulario en el futuro, no en este menú.
 - `ClientForm` (`Crm1.WindowsForms/Forms/ClientForm.cs` + `Forms/ClientForm.Designer.cs`): formulario del módulo de clientes; su diseño y comportamiento se definen en specs/002-formulario-clientes.md.
 
 ## 3. Modelo de datos: Client
@@ -84,4 +84,4 @@ Todas las reglas viven fuera de los formularios (constitución, punto 3). El doc
 
 ## 8. Fuera de alcance (pendiente)
 
-Ampliación de la búsqueda global (specs/004) a más módulos, contactos, oportunidades, tareas (edición completa, specs/005), recordatorios, presupuestos, pedidos, servicios, ventas, historial por cliente, formatos TXT y binario y exportación de datos.
+Ampliación de la búsqueda global (specs/004) a más módulos, contactos, oportunidades, tareas y recordatorios (specs/007, módulo implementado), presupuestos, pedidos, servicios, ventas, historial por cliente, formatos TXT y binario y exportación de datos.

@@ -1,6 +1,6 @@
 # Especificación 001: Formularios en blanco
 
-**Estado:** Activa. Rige la creación de formularios vacíos para que el usuario los diseñe después en el diseñador de Visual Studio. La especificación `specs/000-fundamentos.md` sigue vigente para el diseño general del proyecto. Excepciones: `ClientForm` ya tiene diseño propio (specs/002-formulario-clientes.md), `ContactForm` (Futuros clientes) también (specs/003-formulario-futuros-clientes.md), `SearchForm` (Búsqueda) también (specs/004-busqueda-global.md) y `TaskForm` (Tareas) tiene diseño propio solo visual, sin lógica (specs/005-tareas.md).
+**Estado:** Activa. Rige la creación de formularios vacíos para que el usuario los diseñe después en el diseñador de Visual Studio. La especificación `specs/000-fundamentos.md` sigue vigente para el diseño general del proyecto. Excepciones: `ClientForm` ya tiene diseño propio (specs/002-formulario-clientes.md), `ContactForm` (Futuros clientes) también (specs/003-formulario-futuros-clientes.md), `SearchForm` (Búsqueda) también (specs/004-busqueda-global.md), `TaskForm` (Tareas) tiene diseño propio solo visual, sin lógica (specs/005-tareas.md) y `ReminderForm` (Recordatorios) está especificado e implementado en specs/007-recordatorios.md.
 
 ## 1. Objetivo
 
@@ -9,12 +9,12 @@ Crear formularios Windows Forms **en blanco**: sin lógica, sin controles y sin 
 ## 2. Proceso
 
 - Los formularios se crean **de uno en uno**, únicamente cuando el usuario lo pida.
-- El formulario principal `MainForm` **queda siempre intacto**: no se modifica ni se le añade código. Únicas excepciones, ya implementadas: "Clientes" muestra `ClientForm`, "Futuros clientes" muestra `ContactForm`, "Búsqueda" muestra `SearchForm` y "Tareas" muestra `TaskForm` (specs/005, solo diseño), embebidos en su área central (`panelContent`), según specs/000-fundamentos.md, specs/002, specs/003, specs/004 y specs/005.
+- El formulario principal `MainForm` **queda siempre intacto**: no se modifica ni se le añade código. Únicas excepciones, ya implementadas: "Clientes" muestra `ClientForm`, "Futuros clientes" muestra `ContactForm`, "Búsqueda" muestra `SearchForm`, "Tareas" muestra `TaskForm` (specs/005) y "Recordatorios" muestra `ReminderForm` (specs/007, implementado), embebidos en su área central (`panelContent`), según specs/000-fundamentos.md, specs/002, specs/003, specs/004, specs/005 y specs/007.
 - Ningún formulario nuevo se conecta al menú lateral de `MainForm`, salvo las excepciones anteriores.
 
 ## 3. Patrón de cada formulario
 
-- `ClientForm` y `ContactForm` ya no siguen este patrón: su diseño (tabla y botones) se rige por specs/002-formulario-clientes.md y specs/003-formulario-futuros-clientes.md respectivamente. `TaskForm` tampoco: diseño visual de specs/005-tareas.md, pendiente de lógica.
+- `ClientForm` y `ContactForm` ya no siguen este patrón: su diseño (tabla y botones) se rige por specs/002-formulario-clientes.md y specs/003-formulario-futuros-clientes.md respectivamente. `TaskForm` tampoco: se rige por specs/005-tareas.md (módulo completo en su alcance).
 - Ubicación: `Crm1.WindowsForms/Forms/`.
 - Dos archivos por formulario, patrón estándar de Visual Studio:
   - `XForm.cs`: clase parcial con el constructor llamando a `InitializeComponent()`.
@@ -33,18 +33,18 @@ Crear formularios Windows Forms **en blanco**: sin lógica, sin controles y sin 
 | 4 | Contactos                 | Por decidir       | Pendiente          |
 | 5 | Oportunidades             | `OpportunityForm` | Pendiente          |
 | 6 | Tareas                    | `TaskForm`        | Creado (specs/005) |
-| 7 | Recordatorios             | `ReminderForm`    | Pendiente          |
+| 7 | Recordatorios             | `ReminderForm`    | Creado (specs/007) |
 | 8 | Presupuestos              | `QuoteForm`       | Pendiente          |
 | 9 | Pedidos                   | `OrderForm`       | Pendiente          |
 | 10| Servicios                 | `ServiceForm`     | Pendiente          |
 | 11| Ventas                    | `SaleForm`        | Pendiente          |
 | 12| Historial                 | `HistoryForm`     | Pendiente          |
 
-Cada formulario se marcará como creado en esta tabla al entregarse; `ClientForm` está creado y diseñado según specs/002-formulario-clientes.md, `ContactForm` (Futuros clientes) según specs/003-formulario-futuros-clientes.md, `SearchForm` (Búsqueda) según specs/004-busqueda-global.md y `TaskForm` (Tareas) según specs/005-tareas.md (solo diseño, sin lógica ni eventos).
+Cada formulario se marcará como creado en esta tabla al entregarse; `ClientForm` está creado y diseñado según specs/002-formulario-clientes.md, `ContactForm` (Futuros clientes) según specs/003-formulario-futuros-clientes.md, `SearchForm` (Búsqueda) según specs/004-busqueda-global.md y `TaskForm` (Tareas) según specs/005-tareas.md (solo diseño, sin lógica ni eventos). `ReminderForm` (Recordatorios) nació en blanco según esta especificación y hoy está especificado e implementado en specs/007-recordatorios.md.
 
 ## 5. Fuera de alcance
 
 - Cualquier lógica, evento o acceso a datos dentro de los formularios.
-- Modificar `MainForm` o su menú (excepciones ya implementadas: "Clientes" muestra `ClientForm`, "Futuros clientes" muestra `ContactForm`, "Búsqueda" muestra `SearchForm` y "Tareas" muestra `TaskForm`, embebidos en el área central).
+- Modificar `MainForm` o su menú (excepciones ya implementadas: "Clientes" muestra `ClientForm`, "Futuros clientes" muestra `ContactForm`, "Búsqueda" muestra `SearchForm`, "Tareas" muestra `TaskForm` y "Recordatorios" muestra `ReminderForm` (specs/007, implementado), embebidos en el área central).
 - Conectar formularios entre sí (salvo la muestra embebida de `ClientForm` y `ContactForm` desde el menú, ya implementada).
 - Pruebas automatizadas (no hay lógica que probar; la constitución las exige para negocio y persistencia, que se especificarán aparte).
