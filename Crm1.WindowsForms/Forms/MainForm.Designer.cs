@@ -38,6 +38,7 @@ partial class MainForm
         this.searchMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.prospectsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.tasksMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+        this.remindersMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.bottomSeparator = new System.Windows.Forms.ToolStripSeparator();
         this.exitMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.panelContent = new System.Windows.Forms.Panel();
@@ -65,6 +66,7 @@ partial class MainForm
             this.searchMenuItem,
             this.prospectsMenuItem,
             this.tasksMenuItem,
+            this.remindersMenuItem,
             this.bottomSeparator,
             this.exitMenuItem});
         this.menuStrip.LayoutStyle = System.Windows.Forms.ToolStripLayoutStyle.VerticalStackWithOverflow;
@@ -128,6 +130,17 @@ partial class MainForm
         this.tasksMenuItem.Text = "Tareas";
         this.tasksMenuItem.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
         this.tasksMenuItem.Click += new System.EventHandler(this.TasksMenuItem_Click);
+        //
+        // remindersMenuItem
+        //
+        this.remindersMenuItem.AutoSize = false;
+        this.remindersMenuItem.ForeColor = System.Drawing.Color.FromArgb(226, 232, 240);
+        this.remindersMenuItem.Margin = new System.Windows.Forms.Padding(4, 1, 4, 1);
+        this.remindersMenuItem.Padding = new System.Windows.Forms.Padding(8, 0, 0, 0);
+        this.remindersMenuItem.Size = new System.Drawing.Size(212, 40);
+        this.remindersMenuItem.Text = "Recordatorios";
+        this.remindersMenuItem.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.remindersMenuItem.Click += new System.EventHandler(this.RemindersMenuItem_Click);
         // 
         // bottomSeparator
         // 
@@ -212,6 +225,7 @@ partial class MainForm
     private System.Windows.Forms.ToolStripMenuItem searchMenuItem;
     private System.Windows.Forms.ToolStripMenuItem prospectsMenuItem;
     private System.Windows.Forms.ToolStripMenuItem tasksMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem remindersMenuItem;
     private System.Windows.Forms.ToolStripSeparator bottomSeparator;
     private System.Windows.Forms.ToolStripMenuItem exitMenuItem;
     private System.Windows.Forms.Panel panelContent;
