@@ -208,6 +208,26 @@ public sealed class ReminderServiceTests
     }
 
     [Fact]
+    public void Overdue_reminders_older_than_five_days_no_longer_warn()
+    {
+        // Ventana de antigüedad (decisión del usuario, 14/11): un vencido de
+        // exactamente 5 días aún avisa; de 6 días o más, no — ni al abrir ni
+        // al cerrar (quedan como historial).
+        Reminder fiveDaysOld = At(Now.Date.AddDays(-5).AddHours(9));
+        Reminder sixDaysOld = At(Now.Date.AddDays(-6).AddHours(9));
+        Reminder aMonthOld = At(Now.Date.AddDays(-30).AddHours(9));
+        var reminders = new[] { aMonthOld, sixDaysOld, fiveDaysOld };
+
+        List<Reminder> dueOnOpen = ReminderService.GetDueOnOpen(reminders, Now);
+        Assert.Single(dueOnOpen);
+        Assert.Equal(fiveDaysOld.Id, dueOnOpen[0].Id);
+
+        List<Reminder> dueOnClose = ReminderService.GetDueOnClose(reminders, Now);
+        Assert.Single(dueOnClose);
+        Assert.Equal(fiveDaysOld.Id, dueOnClose[0].Id);
+    }
+
+    [Fact]
     public void Dismissed_reminders_never_warn()
     {
         var dismissed = new[]
