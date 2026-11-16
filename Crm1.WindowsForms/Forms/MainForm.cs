@@ -133,6 +133,39 @@ public partial class MainForm : System.Windows.Forms.Form
                 WarnNavigationBlocked("Clientes", "El registro encontrado no está en la tabla de Clientes; puede haber cambios sin guardar.");
             }
         }
+        else if (module == SearchModule.Task)
+        {
+            taskForm ??= new TaskForm();
+            if (taskForm.IsEditing)
+            {
+                WarnNavigationBlocked("Tareas", "Hay una edición en curso en Tareas.\n\nCancela o guarda los cambios antes de ir al registro encontrado.");
+                return;
+            }
+
+            // La tarea puede estar oculta por la vista filtrada de otro
+            // registro: se vuelve a la vista completa antes de marcarla.
+            taskForm.ShowAllTasks();
+            ShowModule(taskForm);
+            if (!taskForm.SelectTaskById(id))
+            {
+                WarnNavigationBlocked("Tareas", "La tarea encontrada no está en la tabla de Tareas; puede estar fuera de la vista o haber cambios sin guardar.");
+            }
+        }
+        else if (module == SearchModule.Reminder)
+        {
+            reminderForm ??= new ReminderForm();
+            if (reminderForm.IsEditing)
+            {
+                WarnNavigationBlocked("Recordatorios", "Hay una edición en curso en Recordatorios.\n\nCancela o guarda los cambios antes de ir al registro encontrado.");
+                return;
+            }
+
+            ShowModule(reminderForm);
+            if (!reminderForm.SelectReminderById(id))
+            {
+                WarnNavigationBlocked("Recordatorios", "El recordatorio encontrado no está en la tabla de Recordatorios; puede haber cambios sin guardar.");
+            }
+        }
         else
         {
             contactForm ??= new ContactForm();

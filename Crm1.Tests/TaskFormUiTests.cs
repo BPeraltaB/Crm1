@@ -658,4 +658,26 @@ public sealed class TaskFormUiTests
             Assert.False(grid.Rows[0].Cells["actionColumn"].ReadOnly);
         });
     }
+
+    // Navegación desde la búsqueda global (specs/004 §7).
+    [Fact]
+    public void SelectTaskById_marks_the_task_and_rejects_unknown_ids()
+    {
+        Client ana = Fixtures.Client("Ana", "12345678Z");
+        Task first = TaskOf("Llamar", ana.Id);
+        Task second = TaskOf("Enviar correo", ana.Id);
+        UiTestEnvironment.WriteClients(ana);
+        UiTestEnvironment.WriteContacts();
+        UiTestEnvironment.WriteTasks(first, second);
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new TaskForm(new PromptRecorder().Answer);
+
+            Assert.False(form.IsEditing);
+            Assert.True(form.SelectTaskById(second.Id));
+            Assert.Equal(second.Id, form.CurrentTaskId);
+            Assert.False(form.SelectTaskById(Guid.NewGuid()));
+        });
+    }
 }

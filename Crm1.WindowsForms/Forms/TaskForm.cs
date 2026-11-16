@@ -105,6 +105,36 @@ public partial class TaskForm : System.Windows.Forms.Form
     public bool HasUnsavedChanges => _dirty;
 
     /// <summary>
+    /// Verdadero mientras hay una fila en edición (Nuevo o Modificar). Lo usa
+    /// la búsqueda global antes de navegar hasta una tarea (specs/004 §7).
+    /// </summary>
+    public bool IsEditing => _activeRow is not null;
+
+    /// <summary>
+    /// Marca como tarea actual la del identificador indicado y desplaza la
+    /// tabla hasta su fila (búsqueda global, specs/004 §7). Devuelve false si
+    /// hay una edición en curso o la tarea no está en la vista actual
+    /// (puede estar oculta por el filtro o haber cambios sin guardar).
+    /// </summary>
+    public bool SelectTaskById(Guid taskId)
+    {
+        if (_activeRow is not null)
+        {
+            return false;
+        }
+
+        System.Windows.Forms.DataGridViewRow? row = FindRowById(taskId);
+        if (row is null)
+        {
+            return false;
+        }
+
+        tasksDataGridView.CurrentCell = row.Cells["actionColumn"];
+        tasksDataGridView.FirstDisplayedScrollingRowIndex = row.Index;
+        return true;
+    }
+
+    /// <summary>
     /// Muestra solo las tareas del cliente o futuro cliente indicado, con el
     /// aviso «Tareas de: …» y el botón «Ver todas» (botón Tareas de otros
     /// formularios, specs/005 §7). Con edición o cambios pendientes no se

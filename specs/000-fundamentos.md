@@ -84,4 +84,4 @@ Todas las reglas viven fuera de los formularios (constitución, punto 3). El doc
 
 ## 8. Fuera de alcance (pendiente)
 
-Ampliación de la búsqueda global (specs/004) a más módulos, contactos, oportunidades, tareas y recordatorios (specs/007, módulo implementado), presupuestos, pedidos, servicios, ventas, historial por cliente, formatos TXT y binario y exportación de datos.
+Ampliación de la búsqueda global a los módulos que falten: contactos, oportunidades, presupuestos, pedidos, servicios, ventas, historial por cliente (tareas y recordatorios ya están, specs/004), formatos TXT y binario y exportación de datos.

@@ -540,4 +540,26 @@ public sealed class ReminderFormUiTests
             Assert.False(form.HasUnsavedChanges);
         });
     }
+
+    // Navegación desde la búsqueda global (specs/004 §7).
+    [Fact]
+    public void SelectReminderById_marks_the_reminder_and_rejects_unknown_ids()
+    {
+        Client ana = Fixtures.Client("Ana", "12345678Z");
+        Reminder first = ReminderOf("Revisar propuesta", ana.Id, new DateTime(2026, 12, 1, 9, 15, 0));
+        Reminder second = ReminderOf("Llamar de nuevo", ana.Id, new DateTime(2026, 12, 2, 10, 0, 0));
+        UiTestEnvironment.WriteClients(ana);
+        UiTestEnvironment.WriteContacts();
+        UiTestEnvironment.WriteReminders(first, second);
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ReminderForm(new PromptRecorder().Answer);
+
+            Assert.False(form.IsEditing);
+            Assert.True(form.SelectReminderById(second.Id));
+            Assert.Equal(second.Id, form.CurrentReminderId);
+            Assert.False(form.SelectReminderById(Guid.NewGuid()));
+        });
+    }
 }

@@ -15,8 +15,10 @@ public partial class SearchForm : System.Windows.Forms.Form
     private static readonly System.Drawing.Color SelectionBorderColor = System.Drawing.Color.FromArgb(100, 116, 139);
     private const float SelectionBorderWidth = 3F;
 
-    // Lectura de los archivos de datos; la búsqueda nunca escribe en disco.
-    private readonly IDataStore _dataStore = new SqlDataStore();
+    // Lectura de la base de datos; la búsqueda nunca escribe en disco. En
+    // concreto SqlDataStore porque también carga tareas y recordatorios
+    // (specs/005 y specs/007), que viven fuera de IDataStore.
+    private readonly SqlDataStore _dataStore = new();
 
     /// <summary>
     /// Se lanza al elegir un resultado (doble clic o Enter) para pedir a
@@ -51,26 +53,35 @@ public partial class SearchForm : System.Windows.Forms.Form
     }
 
     /// <summary>
-    /// Busca en los datos guardados y rellena la tabla de resultados. Un fallo
-    /// de lectura se muestra como error y deja los resultados vacíos, nunca
-    /// como una búsqueda correcta sin filas (constitución, punto 5).
+    /// Busca en los datos guardados y rellena las dos tablas de resultados:
+    /// clientes y futuros clientes arriba (sus 13 columnas) y tareas y
+    /// recordatorios abajo (specs/004 §7). Un fallo de lectura se muestra
+    /// como error y deja los resultados vacíos, nunca como una búsqueda
+    /// correcta sin filas (constitución, punto 5).
     /// </summary>
     private void RunSearch()
     {
         resultsDataGridView.Rows.Clear();
+        tasksDataGridView.Rows.Clear();
 
         string term = searchTextBox.Text;
         if (term.Trim().Length == 0)
         {
+            tasksLabel.Visible = false;
+            tasksDataGridView.Visible = false;
             return;
         }
 
         List<Client> clients;
         List<Contact> contacts;
+        List<Models.Task> tasks;
+        List<Reminder> reminders;
         try
         {
             clients = _dataStore.LoadClients();
             contacts = _dataStore.LoadContacts();
+            tasks = _dataStore.LoadTasks();
+            reminders = _dataStore.LoadReminders();
         }
         catch (Exception ex)
         {
@@ -82,62 +93,119 @@ public partial class SearchForm : System.Windows.Forms.Form
             return;
         }
 
-        foreach (SearchMatch match in SearchService.Search(clients, contacts, term))
+        foreach (SearchMatch match in SearchService.Search(clients, contacts, tasks, reminders, term))
         {
-            // Rellena la fila con el registro completo, igual que la tabla de su módulo.
-            int index;
-            if (match.Module == SearchModule.Client)
+            if (match.Module is SearchModule.Task or SearchModule.Reminder)
             {
-                Client client = match.Client!;
-                index = resultsDataGridView.Rows.Add(
-                    "Clientes",
-                    client.FirstName,
-                    client.LastName1,
-                    client.LastName2,
-                    client.TaxId,
-                    client.Phone,
-                    client.Email,
-                    client.Address,
-                    client.PostalCode,
-                    client.City,
-                    client.Province,
-                    client.Status == ClientStatus.Inactive ? "Inactivo" : "Activo",
-                    client.RegistrationDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
-                    client.Notes);
+                AddTaskResultRow(match);
             }
             else
             {
-                Contact contact = match.Contact!;
-                index = resultsDataGridView.Rows.Add(
-                    "Futuros clientes",
-                    contact.FirstName,
-                    contact.LastName1,
-                    contact.LastName2,
-                    contact.TaxId,
-                    contact.Phone,
-                    contact.Email,
-                    contact.Address,
-                    contact.PostalCode,
-                    contact.City,
-                    contact.Province,
-                    contact.Status == ContactStatus.Discarded ? "Descartado" : "Pendiente",
-                    contact.RegistrationDate == default
-                        ? string.Empty
-                        : contact.RegistrationDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
-                    contact.Notes);
+                AddRecordResultRow(match);
             }
-
-            resultsDataGridView.Rows[index].Tag = (match.Module, match.Id);
         }
+
+        // La tabla de tareas y recordatorios solo ocupa espacio si hay filas.
+        bool hasTaskRows = tasksDataGridView.Rows.Count > 0;
+        tasksLabel.Visible = hasTaskRows;
+        tasksDataGridView.Visible = hasTaskRows;
+    }
+
+    /// <summary>
+    /// Añade un resultado de cliente o futuro cliente a la tabla superior,
+    /// con el registro completo igual que la tabla de su módulo.
+    /// </summary>
+    private void AddRecordResultRow(SearchMatch match)
+    {
+        int index;
+        if (match.Module == SearchModule.Client)
+        {
+            Client client = match.Client!;
+            index = resultsDataGridView.Rows.Add(
+                "Clientes",
+                client.FirstName,
+                client.LastName1,
+                client.LastName2,
+                client.TaxId,
+                client.Phone,
+                client.Email,
+                client.Address,
+                client.PostalCode,
+                client.City,
+                client.Province,
+                client.Status == ClientStatus.Inactive ? "Inactivo" : "Activo",
+                client.RegistrationDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+                client.Notes);
+        }
+        else
+        {
+            Contact contact = match.Contact!;
+            index = resultsDataGridView.Rows.Add(
+                "Futuros clientes",
+                contact.FirstName,
+                contact.LastName1,
+                contact.LastName2,
+                contact.TaxId,
+                contact.Phone,
+                contact.Email,
+                contact.Address,
+                contact.PostalCode,
+                contact.City,
+                contact.Province,
+                contact.Status == ContactStatus.Discarded ? "Descartado" : "Pendiente",
+                contact.RegistrationDate == default
+                    ? string.Empty
+                    : contact.RegistrationDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+                contact.Notes);
+        }
+
+        resultsDataGridView.Rows[index].Tag = (match.Module, match.Id);
+    }
+
+    /// <summary>
+    /// Añade un resultado de tarea o recordatorio a la tabla inferior: tipo,
+    /// título o asunto, registro vinculado con su prefijo, fecha y estado.
+    /// </summary>
+    private void AddTaskResultRow(SearchMatch match)
+    {
+        int index;
+        if (match.Module == SearchModule.Task)
+        {
+            Models.Task task = match.Task!;
+            index = tasksDataGridView.Rows.Add(
+                "Tarea",
+                task.Action,
+                match.RelatedName,
+                task.DueDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+                task.Status switch
+                {
+                    Models.TaskStatus.Completed => "Completada",
+                    Models.TaskStatus.InProgress => "En curso",
+                    _ => "Pendiente"
+                });
+        }
+        else
+        {
+            Reminder reminder = match.Reminder!;
+            index = tasksDataGridView.Rows.Add(
+                "Recordatorio",
+                reminder.Subject,
+                match.RelatedName,
+                reminder.RemindAt.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture),
+                reminder.Status == ReminderStatus.Dismissed ? "Descartado" : "Activo");
+        }
+
+        tasksDataGridView.Rows[index].Tag = (match.Module, match.Id);
     }
 
     /// <summary>
     /// Dibuja el borde grueso alrededor de la fila seleccionada, la misma marca
-    /// visual que en ClientForm y ContactForm; las celdas siguen siempre blancas.
+    /// visual que en los módulos; las celdas siguen siempre blancas. Sirve a
+    /// las dos tablas de resultados.
     /// </summary>
     private void ResultsDataGridView_RowPostPaint(object? sender, System.Windows.Forms.DataGridViewRowPostPaintEventArgs e)
     {
-        if (e.RowIndex < 0 || !resultsDataGridView.Rows[e.RowIndex].Selected)
+        if (e.RowIndex < 0 || sender is not DataGridView grid || !grid.Rows[e.RowIndex].Selected)
         {
             return;
         }
@@ -153,37 +221,38 @@ public partial class SearchForm : System.Windows.Forms.Form
     }
 
     /// <summary>
-    /// Navega hasta el registro de la fila con doble clic.
+    /// Navega hasta el registro de la fila con doble clic (ambas tablas).
     /// </summary>
     private void ResultsDataGridView_CellDoubleClick(object? sender, System.Windows.Forms.DataGridViewCellEventArgs e)
     {
-        NavigateToResult(e.RowIndex);
+        NavigateToResult(sender as DataGridView, e.RowIndex);
     }
 
     /// <summary>
     /// Navega con Enter a la fila actual; la tecla se consume para que no
-    /// avance a la fila siguiente.
+    /// avance a la fila siguiente (ambas tablas).
     /// </summary>
     private void ResultsDataGridView_KeyDown(object? sender, System.Windows.Forms.KeyEventArgs e)
     {
-        if (e.KeyCode == System.Windows.Forms.Keys.Enter && resultsDataGridView.CurrentCell is not null)
+        if (e.KeyCode == System.Windows.Forms.Keys.Enter
+            && sender is DataGridView { CurrentCell: not null } grid)
         {
             e.Handled = true;
-            NavigateToResult(resultsDataGridView.CurrentCell.RowIndex);
+            NavigateToResult(grid, grid.CurrentCell.RowIndex);
         }
     }
 
     /// <summary>
     /// Pide a MainForm que muestre el módulo y marque el registro encontrado.
     /// </summary>
-    private void NavigateToResult(int rowIndex)
+    private void NavigateToResult(DataGridView? grid, int rowIndex)
     {
-        if (rowIndex < 0)
+        if (grid is null || rowIndex < 0)
         {
             return;
         }
 
-        if (resultsDataGridView.Rows[rowIndex].Tag is (SearchModule module, Guid id))
+        if (grid.Rows[rowIndex].Tag is (SearchModule module, Guid id))
         {
             NavigateRequested?.Invoke(module, id);
         }

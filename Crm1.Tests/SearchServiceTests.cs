@@ -1,6 +1,7 @@
 using Crm1.WindowsForms.Models;
 using Crm1.WindowsForms.Services;
 using Xunit;
+using Task = Crm1.WindowsForms.Models.Task;
 
 namespace Crm1.Tests;
 
@@ -158,6 +159,118 @@ public sealed class SearchServiceTests
         Assert.Same(client, match.Client);
         Assert.Null(match.Contact);
     }
+
+    // Pruebas de la ampliación a tareas y recordatorios (specs/004 §7).
+
+    [Fact]
+    public void Search_TaskMatchesByTitleWithResolvedRelatedName()
+    {
+        Client ana = NewClient("Ana");
+        Task task = NewTask("Llamar para la propuesta", ana.Id, TaskRelatedType.Client);
+
+        IReadOnlyList<SearchMatch> matches = SearchService.Search(
+            new List<Client> { ana }, new List<Contact>(), new List<Task> { task }, new List<Reminder>(), "llamar");
+
+        SearchMatch match = Assert.Single(matches);
+        Assert.Equal(SearchModule.Task, match.Module);
+        Assert.Equal(task.Id, match.Id);
+        Assert.Equal("Llamar para la propuesta", match.DisplayName);
+        Assert.Same(task, match.Task);
+        Assert.Equal("(Cliente) Ana", match.RelatedName);
+        Assert.Contains("Título: Llamar para la propuesta", match.MatchedText);
+    }
+
+    [Fact]
+    public void Search_TaskMatchesByDescriptionStatusAndPriorityLabels()
+    {
+        Client ana = NewClient("Ana");
+        Task task = NewTask("Otra cosa", ana.Id, TaskRelatedType.Client,
+            status: Crm1.WindowsForms.Models.TaskStatus.Completed, priority: TaskPriority.High);
+
+        Assert.Single(SearchService.Search(
+            new List<Client>(), new List<Contact>(), new List<Task> { task }, new List<Reminder>(), "completada"));
+        Assert.Single(SearchService.Search(
+            new List<Client>(), new List<Contact>(), new List<Task> { task }, new List<Reminder>(), "alta"));
+        Assert.Single(SearchService.Search(
+            new List<Client>(), new List<Contact>(), new List<Task> { task }, new List<Reminder>(), "propuesta"));
+    }
+
+    [Fact]
+    public void Search_ReminderMatchesBySubjectAndDateTimeWithSeconds()
+    {
+        Contact eva = NewContact("Eva");
+        Reminder reminder = new()
+        {
+            Id = Guid.NewGuid(),
+            Subject = "Llamada de seguimiento",
+            RemindAt = new DateTime(2026, 11, 20, 10, 30, 0),
+            Status = ReminderStatus.Active,
+            RelatedId = eva.Id,
+            RelatedType = TaskRelatedType.Prospect
+        };
+
+        SearchMatch match = Assert.Single(SearchService.Search(
+            new List<Client>(), new List<Contact> { eva }, new List<Task>(), new List<Reminder> { reminder }, "seguimiento"));
+        Assert.Equal(SearchModule.Reminder, match.Module);
+        Assert.Equal("(Futuro cliente) Eva", match.RelatedName);
+
+        Assert.Single(SearchService.Search(
+            new List<Client>(), new List<Contact> { eva }, new List<Task>(), new List<Reminder> { reminder }, "20/11/2026 10:30"));
+    }
+
+    [Fact]
+    public void Search_BrokenLinkIsNotSearchableButShowsAsDash()
+    {
+        Task orphan = NewTask("Tarea huérfana", Guid.NewGuid(), TaskRelatedType.Client);
+
+        SearchMatch match = Assert.Single(SearchService.Search(
+            new List<Client>(), new List<Contact>(), new List<Task> { orphan }, new List<Reminder>(), "huérfana"));
+
+        Assert.Equal("—", match.RelatedName);
+        Assert.Empty(SearchService.Search(
+            new List<Client>(), new List<Contact>(), new List<Task> { orphan }, new List<Reminder>(), "—"));
+    }
+
+    [Fact]
+    public void Search_ReturnsModulesInOrderClientContactTaskReminder()
+    {
+        Client ana = NewClient("Ana");
+        Contact contact = NewContact("Ana");
+        Task task = NewTask("Hablar con Ana", ana.Id, TaskRelatedType.Client);
+        Reminder reminder = new()
+        {
+            Id = Guid.NewGuid(),
+            Subject = "Llamar a Ana",
+            RemindAt = new DateTime(2026, 11, 20, 10, 30, 0),
+            RelatedId = contact.Id,
+            RelatedType = TaskRelatedType.Prospect
+        };
+
+        IReadOnlyList<SearchMatch> matches = SearchService.Search(
+            new List<Client> { ana }, new List<Contact> { contact },
+            new List<Task> { task }, new List<Reminder> { reminder }, "ana");
+
+        Assert.Equal(4, matches.Count);
+        Assert.Equal(SearchModule.Client, matches[0].Module);
+        Assert.Equal(SearchModule.Contact, matches[1].Module);
+        Assert.Equal(SearchModule.Task, matches[2].Module);
+        Assert.Equal(SearchModule.Reminder, matches[3].Module);
+    }
+
+    // Tarea de prueba vinculada al registro indicado.
+    private static Task NewTask(string action, Guid relatedId, TaskRelatedType relatedType,
+        Crm1.WindowsForms.Models.TaskStatus status = Crm1.WindowsForms.Models.TaskStatus.Pending,
+        TaskPriority priority = TaskPriority.Medium) => new()
+    {
+        Id = Guid.NewGuid(),
+        Action = action,
+        Description = "Presentar la propuesta",
+        DueDate = new DateTime(2026, 11, 20),
+        Status = status,
+        Priority = priority,
+        RelatedId = relatedId,
+        RelatedType = relatedType
+    };
 
     // Cliente de prueba con datos opcionales.
     private static Client NewClient(

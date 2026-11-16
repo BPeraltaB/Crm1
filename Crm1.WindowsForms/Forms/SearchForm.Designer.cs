@@ -49,8 +49,16 @@ partial class SearchForm
         this.statusColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
         this.registrationDateColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
         this.notesColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+        this.tasksLabel = new System.Windows.Forms.Label();
+        this.tasksDataGridView = new System.Windows.Forms.DataGridView();
+        this.typeColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+        this.titleColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+        this.tasksRelatedColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+        this.tasksDateColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
+        this.tasksStateColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
         this.searchPanel.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)this.resultsDataGridView).BeginInit();
+        ((System.ComponentModel.ISupportInitialize)this.tasksDataGridView).BeginInit();
         this.SuspendLayout();
         //
         // searchPanel
@@ -205,6 +213,76 @@ partial class SearchForm
         this.notesColumn.Name = "notesColumn";
         this.notesColumn.ReadOnly = true;
         //
+        // tasksLabel
+        //
+        this.tasksLabel.BackColor = System.Drawing.Color.FromArgb(243, 244, 246);
+        this.tasksLabel.Dock = System.Windows.Forms.DockStyle.Bottom;
+        this.tasksLabel.Location = new System.Drawing.Point(0, 592);
+        this.tasksLabel.Name = "tasksLabel";
+        this.tasksLabel.Padding = new System.Windows.Forms.Padding(28, 6, 0, 0);
+        this.tasksLabel.Size = new System.Drawing.Size(1000, 28);
+        this.tasksLabel.TabIndex = 3;
+        this.tasksLabel.Text = "Tareas y recordatorios";
+        //
+        // tasksDataGridView
+        //
+        this.tasksDataGridView.AllowUserToAddRows = false;
+        this.tasksDataGridView.AllowUserToDeleteRows = false;
+        this.tasksDataGridView.AllowUserToResizeRows = false;
+        this.tasksDataGridView.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
+        this.tasksDataGridView.BackgroundColor = System.Drawing.Color.White;
+        this.tasksDataGridView.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+        this.tasksDataGridView.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this.typeColumn,
+            this.titleColumn,
+            this.tasksRelatedColumn,
+            this.tasksDateColumn,
+            this.tasksStateColumn});
+        this.tasksDataGridView.Dock = System.Windows.Forms.DockStyle.Bottom;
+        this.tasksDataGridView.Location = new System.Drawing.Point(0, 412);
+        this.tasksDataGridView.MultiSelect = false;
+        this.tasksDataGridView.Name = "tasksDataGridView";
+        this.tasksDataGridView.ReadOnly = true;
+        this.tasksDataGridView.RowHeadersVisible = false;
+        this.tasksDataGridView.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+        this.tasksDataGridView.Size = new System.Drawing.Size(1000, 180);
+        this.tasksDataGridView.TabIndex = 2;
+        this.tasksDataGridView.CellDoubleClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.ResultsDataGridView_CellDoubleClick);
+        this.tasksDataGridView.KeyDown += new System.Windows.Forms.KeyEventHandler(this.ResultsDataGridView_KeyDown);
+        this.tasksDataGridView.RowPostPaint += new System.Windows.Forms.DataGridViewRowPostPaintEventHandler(this.ResultsDataGridView_RowPostPaint);
+        this.tasksDataGridView.DefaultCellStyle.SelectionBackColor = System.Drawing.Color.White;
+        this.tasksDataGridView.DefaultCellStyle.SelectionForeColor = System.Drawing.Color.Black;
+        //
+        // typeColumn
+        //
+        this.typeColumn.HeaderText = "Tipo";
+        this.typeColumn.Name = "typeColumn";
+        this.typeColumn.ReadOnly = true;
+        //
+        // titleColumn
+        //
+        this.titleColumn.HeaderText = "Título / Asunto";
+        this.titleColumn.Name = "titleColumn";
+        this.titleColumn.ReadOnly = true;
+        //
+        // tasksRelatedColumn
+        //
+        this.tasksRelatedColumn.HeaderText = "Cliente/Futuro cliente";
+        this.tasksRelatedColumn.Name = "tasksRelatedColumn";
+        this.tasksRelatedColumn.ReadOnly = true;
+        //
+        // tasksDateColumn
+        //
+        this.tasksDateColumn.HeaderText = "Fecha";
+        this.tasksDateColumn.Name = "tasksDateColumn";
+        this.tasksDateColumn.ReadOnly = true;
+        //
+        // tasksStateColumn
+        //
+        this.tasksStateColumn.HeaderText = "Estado";
+        this.tasksStateColumn.Name = "tasksStateColumn";
+        this.tasksStateColumn.ReadOnly = true;
+        //
         // SearchForm
         //
         this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -212,12 +290,15 @@ partial class SearchForm
         this.BackColor = System.Drawing.Color.FromArgb(243, 244, 246);
         this.ClientSize = new System.Drawing.Size(1000, 650);
         this.Controls.Add(this.resultsDataGridView);
+        this.Controls.Add(this.tasksLabel);
+        this.Controls.Add(this.tasksDataGridView);
         this.Controls.Add(this.searchPanel);
         this.Name = "SearchForm";
         this.Text = "Búsqueda";
         this.searchPanel.ResumeLayout(false);
         this.searchPanel.PerformLayout();
         ((System.ComponentModel.ISupportInitialize)this.resultsDataGridView).EndInit();
+        ((System.ComponentModel.ISupportInitialize)this.tasksDataGridView).EndInit();
         this.ResumeLayout(false);
     }
 
@@ -227,6 +308,13 @@ partial class SearchForm
     private System.Windows.Forms.Label searchLabel;
     private System.Windows.Forms.TextBox searchTextBox;
     private System.Windows.Forms.DataGridView resultsDataGridView;
+    private System.Windows.Forms.Label tasksLabel;
+    private System.Windows.Forms.DataGridView tasksDataGridView;
+    private System.Windows.Forms.DataGridViewTextBoxColumn typeColumn;
+    private System.Windows.Forms.DataGridViewTextBoxColumn titleColumn;
+    private System.Windows.Forms.DataGridViewTextBoxColumn tasksRelatedColumn;
+    private System.Windows.Forms.DataGridViewTextBoxColumn tasksDateColumn;
+    private System.Windows.Forms.DataGridViewTextBoxColumn tasksStateColumn;
     private System.Windows.Forms.DataGridViewTextBoxColumn moduleColumn;
     private System.Windows.Forms.DataGridViewTextBoxColumn firstNameColumn;
     private System.Windows.Forms.DataGridViewTextBoxColumn lastName1Column;

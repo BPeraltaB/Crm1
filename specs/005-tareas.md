@@ -71,7 +71,7 @@ Módulo de tareas del CRM: seguimiento de tareas con título, descripción, fech
 
 - Módulo de Recordatorios: formulario y avisos aparte (specs/007-recordatorios.md, creada y pendiente de implementar; decisión del usuario: aviso al abrir la app con activos vencidos o de hoy, y al cerrar con vencidos y del día siguiente).
 - Vínculo de tareas con oportunidades (módulo inexistente).
-- Ampliación de la búsqueda global a tareas (specs/004 §7, pendiente).
+- La inclusión de las tareas en la búsqueda global ya está implementada (specs/004 §§3-5).
 
 ## 9. Pruebas
 

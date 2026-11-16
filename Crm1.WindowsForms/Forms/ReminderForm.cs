@@ -98,6 +98,35 @@ public partial class ReminderForm : System.Windows.Forms.Form
     public bool HasUnsavedChanges => _dirty;
 
     /// <summary>
+    /// Verdadero mientras hay una fila en edición (Nuevo o Modificar). Lo usa
+    /// la búsqueda global antes de navegar hasta un recordatorio (specs/004 §7).
+    /// </summary>
+    public bool IsEditing => _activeRow is not null;
+
+    /// <summary>
+    /// Marca como recordatorio actual el del identificador indicado y desplaza
+    /// la tabla hasta su fila (búsqueda global, specs/004 §7). Devuelve false
+    /// si hay una edición en curso o el recordatorio no está en la tabla.
+    /// </summary>
+    public bool SelectReminderById(Guid reminderId)
+    {
+        if (_activeRow is not null)
+        {
+            return false;
+        }
+
+        System.Windows.Forms.DataGridViewRow? row = FindRowById(reminderId);
+        if (row is null)
+        {
+            return false;
+        }
+
+        remindersDataGridView.CurrentCell = row.Cells["subjectColumn"];
+        remindersDataGridView.FirstDisplayedScrollingRowIndex = row.Index;
+        return true;
+    }
+
+    /// <summary>
     /// Diálogos del formulario (avisos, confirmaciones y errores): todo pasa
     /// por aquí. En la aplicación es un MessageBox con este formulario como
     /// dueño; las pruebas automatizadas de interfaz lo sustituyen por un
