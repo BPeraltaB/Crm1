@@ -149,6 +149,51 @@ public sealed class ContactFormUiTests
         });
     }
 
+    // specs/003 §7 + specs/005/007: al convertir, las tareas y recordatorios
+    // del futuro pasan a estar vinculados al cliente nuevo.
+    [Fact]
+    public void Convert_relinks_tasks_and_reminders_to_the_new_client()
+    {
+        Contact convertible = Fixtures.ConvertibleContact();
+        Client client = Fixtures.Client("Ana", "12345678Z");
+        UiTestEnvironment.WriteClients(client, Fixtures.Client("Luis", "23456781R"));
+        UiTestEnvironment.WriteContacts(convertible, Fixtures.Contact("Iker"));
+        UiTestEnvironment.WriteTasks(
+            Fixtures.Task(convertible.Id, TaskRelatedType.Prospect),
+            Fixtures.Task(client.Id, TaskRelatedType.Client));
+        UiTestEnvironment.WriteReminders(
+            Fixtures.Reminder(convertible.Id, TaskRelatedType.Prospect));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ContactForm();
+            var recorder = new PromptRecorder(DialogResult.Yes, DialogResult.Yes, DialogResult.OK);
+            form.Prompt = recorder.Answer;
+            DataGridView grid = FormAccess.Grid(form, "contactsDataGridView");
+
+            grid.CurrentCell = grid.Rows[0].Cells["firstNameColumn"];
+            FormAccess.Click(form, "ConvertButton_Click");
+            FormAccess.Click(form, "SaveButton_Click");
+
+            // 1 tarea + 1 recordatorio reasignados, y el mensaje lo cuenta.
+            Assert.Contains("reasignad", recorder.Messages[2]);
+
+            Assert.Single(UiTestEnvironment.ReadContacts());
+            List<Client> clients = UiTestEnvironment.ReadClients();
+            Assert.Equal(3, clients.Count);
+            Client converted = clients.Single(c => c.TaxId == "11111111H");
+
+            var tasks = UiTestEnvironment.ReadTasks();
+            Assert.Equal(2, tasks.Count);
+            Assert.Contains(tasks, t => t.RelatedId == converted.Id && t.RelatedType == TaskRelatedType.Client);
+            Assert.Contains(tasks, t => t.RelatedId == client.Id && t.RelatedType == TaskRelatedType.Client);
+
+            var reminder = Assert.Single(UiTestEnvironment.ReadReminders());
+            Assert.Equal(converted.Id, reminder.RelatedId);
+            Assert.Equal(TaskRelatedType.Client, reminder.RelatedType);
+        });
+    }
+
     [Fact]
     public void Convert_refused_in_the_second_confirmation_keeps_everything()
     {

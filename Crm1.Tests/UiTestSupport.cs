@@ -2,6 +2,7 @@ using System.Reflection;
 using Crm1.WindowsForms.Models;
 using Crm1.WindowsForms.Services;
 using Task = Crm1.WindowsForms.Models.Task;
+using TaskStatus = Crm1.WindowsForms.Models.TaskStatus;
 
 namespace Crm1.Tests;
 
@@ -266,5 +267,31 @@ internal static class Fixtures
         RegistrationDate = new DateTime(2026, 2, 10),
         Notes = "Visto en la feria del mueble",
         Status = ContactStatus.Pending
+    };
+
+    /// <summary>Tarea vinculada al registro indicado.</summary>
+    public static Task Task(Guid relatedId, TaskRelatedType relatedType = TaskRelatedType.Client,
+        string action = "Llamar") => new()
+    {
+        Id = Guid.NewGuid(),
+        Action = action,
+        Description = "Presentar la propuesta",
+        DueDate = new DateTime(2026, 11, 20),
+        Status = TaskStatus.Pending,
+        Priority = TaskPriority.Medium,
+        RelatedId = relatedId,
+        RelatedType = relatedType
+    };
+
+    /// <summary>Recordatorio vinculado al registro indicado.</summary>
+    public static Reminder Reminder(Guid relatedId, TaskRelatedType relatedType = TaskRelatedType.Client,
+        string subject = "Llamada de seguimiento") => new()
+    {
+        Id = Guid.NewGuid(),
+        Subject = subject,
+        RemindAt = new DateTime(2026, 11, 20, 10, 30, 0),
+        Status = ReminderStatus.Active,
+        RelatedId = relatedId,
+        RelatedType = relatedType
     };
 }

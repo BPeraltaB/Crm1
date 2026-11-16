@@ -18,7 +18,7 @@
 
 ## 3. Operaciones
 
-- `Services/SqlDataStore` implementa `IDataStore` (mismos métodos que hoy): conexiones cortas y consultas siempre parametrizadas. Las tareas añaden `LoadTasks`/`SaveTasks` propios de `SqlDataStore`, fuera de `IDataStore` (specs/005); los recordatorios, igual, con `LoadReminders`/`SaveReminders` (specs/007).
+- `Services/SqlDataStore` implementa `IDataStore` (mismos métodos que hoy): conexiones cortas y consultas siempre parametrizadas. Las tareas añaden `LoadTasks`/`SaveTasks` propios de `SqlDataStore`, fuera de `IDataStore` (specs/005); los recordatorios, igual, con `LoadReminders`/`SaveReminders` (specs/007). La conversión de un futuro cliente en cliente añade `RelinkRelatedRecords(prospectId, clientId)`: reasigna en una transacción las tablas `Tasks` y `Reminders` cuyo vínculo apuntaba al futuro para que apunten al cliente nuevo (specs/003 §7); devuelve cuántas filas se han reasignado y no toca los vínculos de otros registros.
 - Guardar reemplaza el contenido de la tabla correspondiente en **una transacción** (borrado e inserciones): atómico por naturaleza; un fallo no deja cambios a medias (constitución, punto 5).
 - Las tablas `Clients`, `Contacts`, `Tasks` y `Reminders` son independientes: guardar una no toca las demás.
 - Un fallo de lectura o escritura se muestra como error visible, nunca como éxito (constitución, punto 5). Una base de datos ilegible deja los botones de gestión inactivos (mismo criterio que con los JSON).

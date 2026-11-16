@@ -28,7 +28,10 @@ public partial class ContactForm : System.Windows.Forms.Form
     // Texto del estado por defecto con el que nace cada fila nueva.
     private const string DefaultStatusText = "Pendiente";
 
-    private readonly IDataStore _dataStore;
+    // Almacen SQL de clientes y futuros (specs/006); en concreto, no como
+    // IDataStore porque la conversión necesita RelinkRelatedRecords, propia
+    // de la base (como LoadTasks/SaveTasks en TaskForm).
+    private readonly SqlDataStore _dataStore;
     private readonly PostalCodeCatalog? _catalog;
     private readonly ContactService? _contactService;
 
@@ -618,7 +621,8 @@ public partial class ContactForm : System.Windows.Forms.Form
 
         // Segunda confirmación: advierte de lo que ocurrirá al guardar.
         DialogResult second = Prompt(
-            $"Al guardar, {displayName} se dará de alta en Clientes y desaparecerá de Futuros clientes.\n\n" +
+            $"Al guardar, {displayName} se dará de alta en Clientes, desaparecerá de Futuros clientes " +
+            "y sus tareas y recordatorios pasarán a estar vinculados al cliente nuevo.\n\n" +
             "Hasta entonces puedes deshacerlo con Cancelar o saliendo sin guardar.\n\n" +
             "¿Confirmas la conversión?",
             "CRM1 — Confirmar conversión",
@@ -629,7 +633,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
 
         // Conversión en memoria: la fila se retira de la tabla y el alta se
-        // escribe en clients.json al pulsar Guardar, nunca antes.
+        // escribe en la base de datos al pulsar Guardar, nunca antes.
         _pendingConversions.Add(result.Client!);
         _convertedContacts.Add(contact);
         contactsDataGridView.Rows.Remove(row);
@@ -800,9 +804,12 @@ public partial class ContactForm : System.Windows.Forms.Form
             contactsDataGridView.Rows[rowIndexes[i]].Tag = contacts[i].Id;
         }
 
-        // Conversiones a cliente (specs/003, sección 7): primero se escribe el
-        // alta en clients.json y solo si funciona se guarda contacts.json sin
-        // los convertidos; un fallo no toca nada y se muestra (constitución, 5).
+        // Conversiones a cliente (specs/003, sección 7): primero se da de alta
+        // al cliente en la base, luego sus tareas y recordatorios pasan a
+        // apuntar al cliente nuevo (specs/005 y specs/007) y solo si todo
+        // funciona se guarda la tabla sin los convertidos. Un fallo se muestra
+        // tal cual ocurrió, nunca como éxito (constitución, punto 5).
+        int relinkedCount = 0;
         if (_pendingConversions.Count > 0)
         {
             try
@@ -815,6 +822,26 @@ public partial class ContactForm : System.Windows.Forms.Form
             {
                 Prompt(
                     "No se han podido dar de alta los clientes convertidos; no se ha guardado nada.\n\n" +
+                    ex.Message,
+                    "CRM1 — Error al guardar",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // Las listas van en paralelo: mismo índice = misma conversión.
+            try
+            {
+                for (int i = 0; i < _pendingConversions.Count && i < _convertedContacts.Count; i++)
+                {
+                    relinkedCount += _dataStore.RelinkRelatedRecords(
+                        _convertedContacts[i].Id, _pendingConversions[i].Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                Prompt(
+                    "Los clientes convertidos se han dado de alta, pero sus tareas y recordatorios " +
+                    "no se han podido reasignar al cliente nuevo; no se ha guardado nada más.\n\n" +
                     ex.Message,
                     "CRM1 — Error al guardar",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -861,7 +888,8 @@ public partial class ContactForm : System.Windows.Forms.Form
 
         Prompt(
             convertedCount > 0
-                ? $"Se han guardado {contacts.Count} futuro(s) cliente(s) y se ha(n) dado de alta {convertedCount} cliente(s) correctamente."
+                ? $"Se han guardado {contacts.Count} futuro(s) cliente(s) y se ha(n) dado de alta {convertedCount} cliente(s) correctamente." +
+                    (relinkedCount > 0 ? $"\nSe han reasignado {relinkedCount} tarea(s)/recordatorio(s) al cliente nuevo." : string.Empty)
                 : $"Se han guardado {contacts.Count} futuro(s) cliente(s) correctamente.",
             "CRM1 — Guardar",
             MessageBoxButtons.OK, MessageBoxIcon.Information);

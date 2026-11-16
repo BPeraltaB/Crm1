@@ -279,4 +279,100 @@ public sealed class SqlDataStoreTests : IDisposable
 
         Assert.Empty(reopened.LoadClients());
     }
+
+    // Pruebas de la reasignación de vínculos al convertir un futuro cliente
+    // en cliente (specs/003 §7, specs/005 y specs/007).
+
+    // Copia de una tarea con otro vínculo (los modelos son clases).
+    private static Task WithLink(Task task, Guid relatedId, TaskRelatedType relatedType) => new()
+    {
+        Id = task.Id,
+        Action = task.Action,
+        Description = task.Description,
+        DueDate = task.DueDate,
+        Status = task.Status,
+        Priority = task.Priority,
+        RelatedId = relatedId,
+        RelatedType = relatedType
+    };
+
+    // Copia de un recordatorio con otro vínculo.
+    private static Reminder WithLink(Reminder reminder, Guid relatedId, TaskRelatedType relatedType) => new()
+    {
+        Id = reminder.Id,
+        Subject = reminder.Subject,
+        RemindAt = reminder.RemindAt,
+        Status = reminder.Status,
+        RelatedId = relatedId,
+        RelatedType = relatedType
+    };
+
+    [Fact]
+    public void Relink_moves_tasks_and_reminders_of_the_converted_prospect()
+    {
+        SqlDataStore store = new(DatabasePath, LegacyStore);
+        Guid prospectId = Guid.NewGuid();
+        Guid clientId = Guid.NewGuid();
+
+        Task prospectTask = WithLink(SampleTask(), prospectId, TaskRelatedType.Prospect);
+        prospectTask.Id = Guid.NewGuid();
+        Task clientTask = SampleTask(); // Ya vinculada a un cliente: no se toca.
+        Reminder prospectReminder = WithLink(SampleReminder(), prospectId, TaskRelatedType.Prospect);
+        store.SaveTasks(new List<Task> { prospectTask, clientTask });
+        store.SaveReminders(new List<Reminder> { prospectReminder });
+
+        int moved = store.RelinkRelatedRecords(prospectId, clientId);
+
+        Assert.Equal(2, moved);
+        List<Task> tasks = store.LoadTasks();
+        Task movedTask = tasks.Single(task => task.Id == prospectTask.Id);
+        Assert.Equal(clientId, movedTask.RelatedId);
+        Assert.Equal(TaskRelatedType.Client, movedTask.RelatedType);
+        Task untouchedTask = tasks.Single(task => task.Id == clientTask.Id);
+        Assert.Equal(SampleTask().RelatedId, untouchedTask.RelatedId);
+        Assert.Equal(TaskRelatedType.Client, untouchedTask.RelatedType);
+
+        Reminder movedReminder = store.LoadReminders().Single();
+        Assert.Equal(clientId, movedReminder.RelatedId);
+        Assert.Equal(TaskRelatedType.Client, movedReminder.RelatedType);
+    }
+
+    [Fact]
+    public void Relink_without_matching_rows_returns_zero_and_changes_nothing()
+    {
+        SqlDataStore store = new(DatabasePath, LegacyStore);
+        Guid prospectId = Guid.NewGuid();
+        store.SaveTasks(new List<Task> { SampleTask() });
+        store.SaveReminders(new List<Reminder> { SampleReminder() });
+
+        int moved = store.RelinkRelatedRecords(prospectId, Guid.NewGuid());
+
+        Assert.Equal(0, moved);
+        Assert.Equal(SampleTask().RelatedId, store.LoadTasks().Single().RelatedId);
+        Assert.Equal(SampleReminder().RelatedId, store.LoadReminders().Single().RelatedId);
+    }
+
+    [Fact]
+    public void Relink_does_not_touch_links_of_other_prospects()
+    {
+        // Dos futuros distintos: solo el convertido cambia de vínculo.
+        SqlDataStore store = new(DatabasePath, LegacyStore);
+        Guid convertedId = Guid.NewGuid();
+        Guid otherProspectId = Guid.NewGuid();
+        Guid clientId = Guid.NewGuid();
+
+        Task converted = WithLink(SampleTask(), convertedId, TaskRelatedType.Prospect);
+        Task other = WithLink(SampleTask(), otherProspectId, TaskRelatedType.Prospect);
+        other.Id = Guid.Parse("77777777-7777-7777-7777-777777777777");
+        store.SaveTasks(new List<Task> { converted, other });
+
+        int moved = store.RelinkRelatedRecords(convertedId, clientId);
+
+        Assert.Equal(1, moved);
+        List<Task> tasks = store.LoadTasks();
+        Assert.Equal(TaskRelatedType.Client, tasks.Single(task => task.Id == converted.Id).RelatedType);
+        Task untouched = tasks.Single(task => task.Id == other.Id);
+        Assert.Equal(TaskRelatedType.Prospect, untouched.RelatedType);
+        Assert.Equal(otherProspectId, untouched.RelatedId);
+    }
 }

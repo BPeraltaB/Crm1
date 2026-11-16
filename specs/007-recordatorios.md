@@ -78,6 +78,7 @@ Reglas de aviso (**implementadas** en `ReminderService.GetDueOnOpen`/`GetDueOnCl
 
 - Tabla `Reminders` en `Data/crm1.db` (specs/006), espejo del modelo: `Id` TEXT (GUID, clave primaria), `Subject` TEXT, `RemindAt` TEXT (ISO `yyyy-MM-dd HH:mm:ss`), `Status` TEXT (Active/Dismissed), `RelatedId` TEXT (GUID) y `RelatedType` TEXT (Client/Prospect). Sin migración desde JSON (dato nuevo, sin histórico).
 - `LoadReminders`/`SaveReminders` en `SqlDataStore`, fuera de `IDataStore` (como `Tasks`): escritura transaccional, independiente del resto de tablas. Fallo de lectura/escritura = error visible, nunca éxito (constitución, punto 5).
+- **Conversión del futuro vinculado** (specs/003 §7): cuando un futuro cliente se convierte en cliente, sus recordatorios pasan a estar vinculados al cliente nuevo automáticamente (`RelinkRelatedRecords`, specs/006); ningún recordatorio queda huérfano.
 
 ## 7. Integración
 

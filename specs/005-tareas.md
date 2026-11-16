@@ -60,6 +60,7 @@ Módulo de tareas del CRM: seguimiento de tareas con título, descripción, fech
 ## 6. Almacenamiento (implementado)
 
 - Tabla `Tasks` en `Data/crm1.db` (specs/006): sin migración desde JSON (las tareas son un dato nuevo, sin histórico), escritura transaccional (borrado e inserciones en una transacción) e independiente de las tablas `Clients` y `Contacts`. Un fallo de lectura o escritura se muestra como error, nunca como éxito ni con pérdida silenciosa de datos. `LoadTasks`/`SaveTasks` viven en `SqlDataStore`, fuera de `IDataStore` (que queda para clientes y futuros clientes).
+- **Conversión del futuro vinculado** (specs/003 §7): cuando un futuro cliente se convierte en cliente, sus tareas pasan a estar vinculadas al cliente nuevo automáticamente (`RelinkRelatedRecords`, specs/006); ninguna tarea queda huérfana ni bloquea Guardar.
 
 ## 7. Integración
 

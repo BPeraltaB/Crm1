@@ -316,6 +316,44 @@ public sealed class SqlDataStore : IDataStore
         }
     });
 
+    /// <summary>
+    /// Reasigna en bloque las tareas y recordatorios de un futuro cliente que
+    /// se convierte en cliente (specs/003 §7, specs/005 y specs/007): todas
+    /// las filas con vínculo al futuro indicado pasan a apuntar al cliente
+    /// nuevo, en una transacción (o no cambia ninguna). Devuelve cuántas filas
+    /// se han reasignado. Los vínculos a otros registros no se tocan.
+    /// </summary>
+    public int RelinkRelatedRecords(Guid prospectId, Guid clientId) => Execute(connection =>
+    {
+        EnsureSchemaAndMigrate(connection);
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        try
+        {
+            int count = 0;
+            count += ExecuteNonQuery(connection, transaction,
+                "UPDATE Tasks SET RelatedId = @clientId, RelatedType = @clientType " +
+                "WHERE RelatedId = @prospectId AND RelatedType = @prospectType",
+                ("@clientId", clientId.ToString()),
+                ("@clientType", nameof(TaskRelatedType.Client)),
+                ("@prospectId", prospectId.ToString()),
+                ("@prospectType", nameof(TaskRelatedType.Prospect)));
+            count += ExecuteNonQuery(connection, transaction,
+                "UPDATE Reminders SET RelatedId = @clientId, RelatedType = @clientType " +
+                "WHERE RelatedId = @prospectId AND RelatedType = @prospectType",
+                ("@clientId", clientId.ToString()),
+                ("@clientType", nameof(TaskRelatedType.Client)),
+                ("@prospectId", prospectId.ToString()),
+                ("@prospectType", nameof(TaskRelatedType.Prospect)));
+            transaction.Commit();
+            return count;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    });
+
     // Abre una conexión (creando antes la carpeta) y ejecuta la acción. Cualquier
     // fallo se convierte en un error visible (constitución, punto 5).
     private T Execute<T>(Func<SqliteConnection, T> action)
@@ -490,12 +528,17 @@ public sealed class SqlDataStore : IDataStore
         command.ExecuteNonQuery();
     }
 
-    private static void ExecuteNonQuery(SqliteConnection connection, SqliteTransaction? transaction, string commandText)
+    private static int ExecuteNonQuery(SqliteConnection connection, SqliteTransaction? transaction, string commandText,
+        params (string Name, string Value)[] parameters)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = commandText;
-        command.ExecuteNonQuery();
+        foreach ((string name, string value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+        return command.ExecuteNonQuery();
     }
 
     private static bool HasSchemaValue(SqliteConnection connection, SqliteTransaction? transaction, string key)
