@@ -56,9 +56,12 @@ public sealed class QuoteService
 
     /// <summary>
     /// Valida un presupuesto concreto; devuelve el error del primer campo que
-    /// falla o null si es correcto.
+    /// falla o null si es correcto. La fecha no puede ser anterior a hoy
+    /// SOLO al dar de alta (isNewCreation): modificar un registro existente
+    /// nunca se bloquea por su fecha histórica, para poder aceptar
+    /// presupuestos pendientes antiguos (decisión del usuario, 18/11).
     /// </summary>
-    public QuoteValidationError? Validate(Quote quote)
+    public QuoteValidationError? Validate(Quote quote, bool isNewCreation = false)
     {
         if (quote.QuoteDate == default)
         {
@@ -69,10 +72,7 @@ public sealed class QuoteService
             };
         }
 
-        // La fecha no puede ser anterior a hoy (decisión del usuario, 18/11):
-        // al guardar salta el mensaje y la celda queda marcada; los registros
-        // históricos sin cambios se reescriben tal cual (specs/009 §5).
-        if (quote.QuoteDate.Date < DateTime.Today)
+        if (isNewCreation && quote.QuoteDate.Date < DateTime.Today)
         {
             return new QuoteValidationError
             {

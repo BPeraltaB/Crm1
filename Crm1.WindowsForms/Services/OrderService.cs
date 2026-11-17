@@ -56,9 +56,11 @@ public sealed class OrderService
 
     /// <summary>
     /// Valida un pedido o abono concreto; devuelve el error del primer campo
-    /// que falla o null si es correcto.
+    /// que falla o null si es correcto. La fecha no puede ser anterior a hoy
+    /// SOLO al dar de alta (isNewCreation): modificar un registro existente
+    /// nunca se bloquea por su fecha histórica (decisión del usuario, 18/11).
     /// </summary>
-    public OrderValidationError? Validate(Order order)
+    public OrderValidationError? Validate(Order order, bool isNewCreation = false)
     {
         if (order.OrderDate == default)
         {
@@ -69,10 +71,7 @@ public sealed class OrderService
             };
         }
 
-        // La fecha no puede ser anterior a hoy (decisión del usuario, 18/11):
-        // al guardar salta el mensaje y la celda queda marcada; los registros
-        // históricos sin cambios se reescriben tal cual (specs/009 §5).
-        if (order.OrderDate.Date < DateTime.Today)
+        if (isNewCreation && order.OrderDate.Date < DateTime.Today)
         {
             return new OrderValidationError
             {

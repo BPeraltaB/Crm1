@@ -130,11 +130,12 @@ public sealed class QuoteFormUiTests
 
             Assert.Contains("1 pedido(s)", recorder.Messages[2]);
 
-            // El pedido hereda fecha, precio, referencia y descripción.
+            // El pedido hereda precio, referencia y descripción, y su fecha
+            // es el día de la aceptación (specs/009 §4.3).
             Order order = Assert.Single(UiTestEnvironment.ReadOrders());
             Assert.Equal(ana.Id, order.ClientId);
             Assert.Equal(OrderKind.Order, order.Kind);
-            Assert.Equal(Tomorrow, order.OrderDate);
+            Assert.Equal(DateTime.Today, order.OrderDate);
             Assert.Equal(1200.56m, order.Amount);
             Assert.Equal("P-2026-0142", order.Reference);
             Assert.Equal("Mobiliario de oficina", order.Description);
@@ -449,6 +450,68 @@ public sealed class QuoteFormUiTests
             Quote saved = Assert.Single(UiTestEnvironment.ReadQuotes());
             Assert.Equal(new DateTime(2025, 12, 20), saved.QuoteDate);
             Assert.False(form.HasUnsavedChanges);
+        });
+    }
+
+    [Fact]
+    public void Accept_pending_quote_with_an_old_date_creates_an_order_dated_today()
+    {
+        // Pendiente con 20 días (fecha pasada pero dentro de la validez):
+        // debe poder aceptarse y su pedido nacer con fecha de hoy.
+        Client ana = Fixtures.Client("Ana", "12345678Z");
+        Quote oldPending = QuoteOf(ana.Id, DateTime.Today.AddDays(-20));
+        UiTestEnvironment.WriteClients(ana);
+        UiTestEnvironment.WriteContacts();
+        UiTestEnvironment.WriteQuotes(oldPending);
+        UiTestEnvironment.WriteOrders();
+
+        WinFormsSta.Run(() =>
+        {
+            var recorder = new PromptRecorder(DialogResult.Yes, DialogResult.OK, DialogResult.OK);
+            using var form = new QuoteForm(recorder.Answer);
+            DataGridView grid = FormAccess.Grid(form, "quotesDataGridView");
+
+            grid.CurrentCell = grid.Rows[0].Cells["quoteDateColumn"];
+            FormAccess.Click(form, "AcceptButton_Click");
+            FormAccess.Click(form, "SaveButton_Click");
+
+            Quote saved = Assert.Single(UiTestEnvironment.ReadQuotes());
+            Assert.Equal(QuoteStatus.Accepted, saved.Status);
+
+            Order order = Assert.Single(UiTestEnvironment.ReadOrders());
+            Assert.Equal(DateTime.Today, order.OrderDate);
+            Assert.Equal(oldPending.Amount, order.Amount);
+            Assert.Equal(oldPending.Reference, order.Reference);
+            Assert.Equal(oldPending.Description, order.Description);
+        });
+    }
+
+    [Fact]
+    public void Modifying_a_historical_quote_to_accepted_is_not_blocked_by_its_old_date()
+    {
+        // Cambio manual del Estado en la tabla: la fecha antigua no bloquea.
+        Client ana = Fixtures.Client("Ana", "12345678Z");
+        Quote oldPending = QuoteOf(ana.Id, DateTime.Today.AddDays(-25));
+        UiTestEnvironment.WriteClients(ana);
+        UiTestEnvironment.WriteContacts();
+        UiTestEnvironment.WriteQuotes(oldPending);
+        UiTestEnvironment.WriteOrders();
+
+        WinFormsSta.Run(() =>
+        {
+            var recorder = new PromptRecorder(DialogResult.OK);
+            using var form = new QuoteForm(recorder.Answer);
+            DataGridView grid = FormAccess.Grid(form, "quotesDataGridView");
+
+            grid.CurrentCell = grid.Rows[0].Cells["quoteDateColumn"];
+            FormAccess.Click(form, "ModifyButton_Click");
+            grid.Rows[0].Cells["statusColumn"].Value = "Aceptado";
+
+            FormAccess.Click(form, "SaveButton_Click");
+
+            Quote saved = Assert.Single(UiTestEnvironment.ReadQuotes());
+            Assert.Equal(QuoteStatus.Accepted, saved.Status);
+            Assert.Equal(oldPending.QuoteDate, saved.QuoteDate);
         });
     }
 

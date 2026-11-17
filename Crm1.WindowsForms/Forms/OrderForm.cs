@@ -763,10 +763,13 @@ public partial class OrderForm : System.Windows.Forms.Form
         }
 
         // Reglas de negocio fuera del formulario (constitución, punto 3),
-        // aplicadas a las filas nuevas o modificadas.
+        // aplicadas a las filas nuevas o modificadas. La regla de «no anterior
+        // a hoy» solo aplica al ALTA: una fila guardada que se modifica nunca
+        // se bloquea por su fecha histórica (specs/009 §5).
         for (int i = 0; i < changedOrders.Count; i++)
         {
-            OrderValidationError? error = _orderService!.Validate(changedOrders[i]);
+            bool isNew = !(changedOrders[i].Id != Guid.Empty && savedById.ContainsKey(changedOrders[i].Id));
+            OrderValidationError? error = _orderService!.Validate(changedOrders[i], isNewCreation: isNew);
             if (error is not null)
             {
                 errors.Add((changedRowIndexes[i], error));

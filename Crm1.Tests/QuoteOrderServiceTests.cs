@@ -70,18 +70,28 @@ public sealed class QuoteOrderServiceTests
     }
 
     [Fact]
-    public void Quote_with_a_date_before_today_is_rejected_with_a_message()
+    public void Quote_with_a_date_before_today_is_rejected_on_creation_with_a_message()
     {
-        QuoteValidationError? error = NewQuoteService().Validate(ValidQuote(q => q.QuoteDate = DateTime.Today.AddDays(-1)));
+        QuoteValidationError? error = NewQuoteService().Validate(
+            ValidQuote(q => q.QuoteDate = DateTime.Today.AddDays(-1)), isNewCreation: true);
         Assert.Equal(nameof(Quote.QuoteDate), error!.Field);
         Assert.Equal("La fecha no puede ser anterior a hoy.", error.Message);
     }
 
     [Fact]
+    public void Quote_with_an_old_date_is_allowed_when_modifying_an_existing_one()
+    {
+        // Un histórico puede modificarse (p. ej. aceptarse) con su fecha antigua.
+        QuoteValidationError? error = NewQuoteService().Validate(
+            ValidQuote(q => q.QuoteDate = DateTime.Today.AddDays(-25)));
+        Assert.Null(error);
+    }
+
+    [Fact]
     public void Quote_with_today_or_a_future_date_is_valid()
     {
-        Assert.Null(NewQuoteService().Validate(ValidQuote(q => q.QuoteDate = DateTime.Today)));
-        Assert.Null(NewQuoteService().Validate(ValidQuote(q => q.QuoteDate = DateTime.Today.AddMonths(2))));
+        Assert.Null(NewQuoteService().Validate(ValidQuote(q => q.QuoteDate = DateTime.Today), isNewCreation: true));
+        Assert.Null(NewQuoteService().Validate(ValidQuote(q => q.QuoteDate = DateTime.Today.AddMonths(2)), isNewCreation: true));
     }
 
     [Theory]
@@ -131,15 +141,22 @@ public sealed class QuoteOrderServiceTests
     }
 
     [Fact]
-    public void Order_with_a_date_before_today_is_rejected_with_a_message()
+    public void Order_with_a_date_before_today_is_rejected_on_creation_with_a_message()
     {
         OrderValidationError? error = NewOrderService().Validate(ValidOrder(o =>
         {
             o.OrderDate = DateTime.Today.AddDays(-3);
             o.Kind = OrderKind.CreditNote;
-        }));
+        }), isNewCreation: true);
         Assert.Equal(nameof(Order.OrderDate), error!.Field);
         Assert.Equal("La fecha no puede ser anterior a hoy.", error.Message);
+    }
+
+    [Fact]
+    public void Order_with_an_old_date_is_allowed_when_modifying_an_existing_one()
+    {
+        OrderValidationError? error = NewOrderService().Validate(ValidOrder(o => o.OrderDate = DateTime.Today.AddDays(-40)));
+        Assert.Null(error);
     }
 
     [Fact]

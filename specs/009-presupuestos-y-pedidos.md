@@ -66,7 +66,7 @@
 ### 4.3 Aceptar un presupuesto (botón «Aceptar»)
 
 1. Activo solo con un presupuesto **Pendiente** marcado; confirmación con el resumen (fecha, precio, referencia y registro vinculado).
-2. El presupuesto pasa a **Aceptado** y **queda en el historial** (para ver cuántos acepta cada cliente); el **pedido se crea aparte**, heredando fecha, precio, referencia y descripción, con Tipo «Pedido» y `OrderId` del presupuesto enlazado.
+2. El presupuesto pasa a **Aceptado** y **queda en el historial** (para ver cuántos acepta cada cliente); el **pedido se crea aparte**, heredando **precio, referencia (el número que los vincula) y descripción**, con Tipo «Pedido», `OrderId` del presupuesto enlazado y **fecha del día de la aceptación** — no la del presupuesto (decisión del usuario, 18/11: aunque el pedido real aún no exista en el programa de administración, el número lo vincula y la fecha refleja cuándo se aceptó).
 3. Si el presupuesto es de un **cliente**: el pedido se crea directamente (en memoria; al Guardar).
 4. Si es de un **futuro cliente**: aviso — «Para crear el pedido, [nombre] debe ser cliente con todos sus datos. ¿Convertirlo ahora?»:
    - **Sí** y el futuro cumple las reglas de clientes → conversión con sus **dos confirmaciones** (specs/003 §7): cliente nuevo Activo; su presupuesto, tareas y recordatorios se revinculan; el pedido se crea a nombre del cliente nuevo.
@@ -78,7 +78,7 @@
 
 ## 5. Reglas de negocio (QuoteService / OrderService)
 
-- **Fecha obligatoria**, válida en dd/MM/aaaa y **nunca anterior a hoy** (decisión del usuario, 18/11/2026): al Guardar una fila nueva o modificada con fecha pasada salta el mensaje «La fecha no puede ser anterior a hoy.», la celda queda marcada con borde rojo y la edición sigue abierta. Los registros históricos guardados **sin cambios** se reescriben tal cual sin revalidar su fecha: el historial previo a la regla permanece (y sigue alimentando los totales por año) («La celda está vacía.» / «La fecha no es válida (dd/mm/aaaa).» / «La fecha no puede ser anterior a hoy.»). **Aceptar** también respeta la regla: un presupuesto con fecha pasada no se acepta hasta corregirla, así el pedido heredado nace siempre con fecha válida.
+- **Fecha obligatoria**, válida en dd/MM/aaaa y, **solo al dar de alta** (Nuevo), **nunca anterior a hoy** (decisión del usuario, 18/11/2026, afinada el mismo día): al Guardar una fila nueva con fecha pasada salta el mensaje «La fecha no puede ser anterior a hoy.», la celda queda marcada con borde rojo y la edición sigue abierta. **Modificar un registro existente nunca se bloquea por su fecha histórica** — así un presupuesto pendiente antiguo puede aceptarse (sus demás reglas sí aplican) — y las filas guardadas sin cambios se reescriben tal cual sin revalidar su fecha, de modo que el historial previo a la regla permanece y sigue alimentando los totales por año («La celda está vacía.» / «La fecha no es válida (dd/mm/aaaa).» / «La fecha no puede ser anterior a hoy.»).
 - **Precio obligatorio**, en formato español — se admite coma o punto como decimal y puntos de miles con coma («1.234,56», «1234,56», «1234.56») — y **mayor que cero** («La celda está vacía.» / «El precio no es válido (usa el formato 1234,56).» / «El precio debe ser mayor que cero.»).
 - **Estado / Tipo** pertenecientes a sus desplegables («El estado no es válido.» / «El tipo no es válido.»).
 - **Vínculo obligatorio**: presupuesto → cliente o futuro existente y del tipo correcto; pedido/abono → **cliente existente** («Debes elegir un cliente o futuro cliente.» / «Debes elegir un cliente.»).

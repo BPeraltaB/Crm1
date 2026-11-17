@@ -988,13 +988,15 @@ public partial class QuoteForm : System.Windows.Forms.Form
         }
     }
 
-    // Pedido que nace de un presupuesto aceptado: hereda fecha, precio,
-    // referencia y descripción (specs/009 §4.3).
+    // Pedido que nace de un presupuesto aceptado: hereda precio, referencia
+    // (el número que los vincula) y descripción, y su fecha es el DÍA DE LA
+    // ACEPTACIÓN — no la del presupuesto (decisión del usuario, 18/11,
+    // specs/009 §4.3).
     private static Order NewOrderFromQuote(Quote quote, Guid clientId) => new()
     {
         Id = Guid.NewGuid(),
         Kind = OrderKind.Order,
-        OrderDate = quote.QuoteDate,
+        OrderDate = DateTime.Today,
         Amount = quote.Amount,
         Reference = quote.Reference,
         Description = quote.Description,
@@ -1167,10 +1169,13 @@ public partial class QuoteForm : System.Windows.Forms.Form
         }
 
         // Reglas de negocio fuera del formulario (constitución, punto 3),
-        // aplicadas a las filas nuevas o modificadas.
+        // aplicadas a las filas nuevas o modificadas. La regla de «no anterior
+        // a hoy» solo aplica al ALTA: una fila guardada que se modifica nunca
+        // se bloquea por su fecha histórica (specs/009 §5).
         for (int i = 0; i < changedQuotes.Count; i++)
         {
-            QuoteValidationError? error = _quoteService!.Validate(changedQuotes[i]);
+            bool isNew = !(changedQuotes[i].Id != Guid.Empty && savedById.ContainsKey(changedQuotes[i].Id));
+            QuoteValidationError? error = _quoteService!.Validate(changedQuotes[i], isNewCreation: isNew);
             if (error is not null)
             {
                 errors.Add((changedRowIndexes[i], error));
