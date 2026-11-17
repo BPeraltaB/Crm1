@@ -112,6 +112,10 @@ public partial class QuoteForm : System.Windows.Forms.Form
 
     private readonly List<AcceptUndo> _sessionAccepts = new();
 
+    // Futuros a los que ya se ofreció la conversión en esta sesión (botón
+    // Aceptar u oferta al Guardar): no se les vuelve a molestar.
+    private readonly HashSet<Guid> _conversionOfferedProspects = new();
+
     /// <summary>
     /// Identificador del presupuesto actual (fila marcada con un clic), o null
     /// si no hay selección. Skill «seleccionar-cliente».
@@ -317,6 +321,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
         _conversionContact = null;
         _conversionClient = null;
         _sessionAccepts.Clear();
+        _conversionOfferedProspects.Clear();
         _lastDatabaseStamp = GetDatabaseStamp();
 
         // Sin presupuesto actual hasta que el usuario marque una fila con un
@@ -869,6 +874,10 @@ public partial class QuoteForm : System.Windows.Forms.Form
             $"Para crear el pedido, {relatedName} debe ser cliente con todos sus datos.\n\n¿Convertirlo ahora?",
             "CRM1 — Aceptar presupuesto",
             MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+        // Ya se le ha ofrecido en esta sesión: el Guardar no vuelve a molestar.
+        _conversionOfferedProspects.Add(quote.RelatedId);
+
         if (convert != DialogResult.Yes)
         {
             UpdateAcceptButton();
@@ -1002,6 +1011,171 @@ public partial class QuoteForm : System.Windows.Forms.Form
         Description = quote.Description,
         ClientId = clientId
     };
+
+    /// <summary>
+    /// Al Guardar, detecta presupuestos que quedan Aceptados de un futuro
+    /// cliente sin pedido —por cambio manual del Estado, fila nueva o un
+    /// «No» anterior— y ofrece convertirlo en cliente en ese momento
+    /// (specs/009 §4.3). A un futuro al que ya se ofreció en esta sesión no
+    /// se le vuelve a molestar.
+    /// </summary>
+    private void OfferConversionForAcceptedProspectQuotes(List<Quote> quotes, List<int> rowIndexes)
+    {
+        var offeredHere = new HashSet<Guid>();
+        for (int i = 0; i < quotes.Count; i++)
+        {
+            Quote quote = quotes[i];
+            if (quote.Status != QuoteStatus.Accepted
+                || quote.RelatedType != TaskRelatedType.Prospect
+                || _quoteOrderIds.GetValueOrDefault(quote.Id) is not null
+                || _conversionOfferedProspects.Contains(quote.RelatedId)
+                || !offeredHere.Add(quote.RelatedId))
+            {
+                continue;
+            }
+
+            string relatedName = CellText(quotesDataGridView.Rows[rowIndexes[i]], "relatedColumn");
+            string quoteName = quote.Description.Length > 0 ? quote.Description
+                : quote.Reference.Length > 0 ? $"con referencia {quote.Reference}"
+                : "sin descripción";
+
+            DialogResult offer = Prompt(
+                $"El presupuesto {quoteName} de {relatedName} está Aceptado.\n\n" +
+                "Un futuro cliente no puede tener pedidos: para crear el suyo hay que convertirlo en cliente.\n\n" +
+                "¿Convertirlo ahora?",
+                "CRM1 — Convertir en cliente",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            _conversionOfferedProspects.Add(quote.RelatedId);
+            if (offer != DialogResult.Yes)
+            {
+                continue;
+            }
+
+            ConvertAcceptedProspectQuotes(quotes, rowIndexes, quote.RelatedId, relatedName);
+        }
+    }
+
+    /// <summary>
+    /// Conversión en línea de un futuro cliente con presupuestos Aceptados
+    /// sin pedido (oferta al Guardar): valida sus datos (carencias si
+    /// faltan), pide la doble confirmación de specs/003 §7, revincula sus
+    /// presupuestos al cliente nuevo y crea sus pedidos heredados, todo en
+    /// memoria hasta el resto del Guardar en curso.
+    /// </summary>
+    private void ConvertAcceptedProspectQuotes(List<Quote> quotes, List<int> rowIndexes, Guid prospectId, string relatedName)
+    {
+        try
+        {
+            List<Contact> contacts = _dataStore!.LoadContacts();
+            List<Client> clients = _dataStore.LoadClients();
+            Contact? contact = contacts.FirstOrDefault(existing => existing.Id == prospectId);
+            if (contact is null)
+            {
+                Prompt(
+                    "No se encuentra el futuro cliente en la base de datos.\n\n" +
+                    "El presupuesto quedará Aceptado sin pedido.",
+                    "CRM1 — Convertir en cliente",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (_catalog is null)
+            {
+                Prompt(
+                    "No se pudo cargar el catálogo de códigos postales; no se puede validar la conversión.\n\n" +
+                    "El presupuesto quedará Aceptado sin pedido.",
+                    "CRM1 — Convertir en cliente",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            var contactService = new ContactService(_catalog, clients.Select(client => client.TaxId));
+            ConversionResult result = contactService.ConvertToClient(contact);
+            if (!result.Success)
+            {
+                Prompt(
+                    $"{relatedName} no puede convertirse en cliente todavía:\n\n" +
+                    string.Join("\n", result.Errors) +
+                    "\n\nEl presupuesto quedará Aceptado sin pedido; cuando completes sus datos, " +
+                    "selecciónalo y pulsa «Crear pedido».",
+                    "CRM1 — Convertir en cliente",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Doble confirmación de la conversión (specs/003 §7).
+            DialogResult first = Prompt(
+                $"Vas a convertir a {relatedName} en cliente con estos datos:\n\n" +
+                ClientSummary(result.Client!) + "\n\n¿Continuar?",
+                "CRM1 — Convertir en cliente",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (first != DialogResult.Yes)
+            {
+                return;
+            }
+
+            DialogResult second = Prompt(
+                $"Al guardar, {relatedName} se dará de alta en Clientes, desaparecerá de Futuros clientes " +
+                "y sus tareas, recordatorios y presupuestos pasarán a estar vinculados al cliente nuevo.\n\n" +
+                "¿Confirmas la conversión?",
+                "CRM1 — Confirmar conversión",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            if (second != DialogResult.Yes)
+            {
+                return;
+            }
+
+            _conversionContact = contact;
+            Client newClient = result.Client!;
+            _conversionClient = newClient;
+
+            // El registro del cliente nuevo entra en el desplegable (esto
+            // reconstruye QuoteService con él; ver specs/009 §4.3).
+            string clientText = $"(Cliente) {DisplayName(contact.FirstName, contact.LastName1, contact.LastName2)}";
+            if (!_relatedByText.ContainsKey(clientText))
+            {
+                AddRelatedItem(clientText, newClient.Id, TaskRelatedType.Client);
+            }
+            string newText = _relatedTextById[newClient.Id];
+
+            // Todos los Aceptados sin pedido de ese futuro pasan al cliente
+            // nuevo y crean su pedido heredado.
+            for (int i = 0; i < quotes.Count; i++)
+            {
+                Quote candidate = quotes[i];
+                if (candidate.RelatedId != prospectId
+                    || candidate.Status != QuoteStatus.Accepted
+                    || _quoteOrderIds.GetValueOrDefault(candidate.Id) is not null)
+                {
+                    continue;
+                }
+
+                quotesDataGridView.Rows[rowIndexes[i]].Cells["relatedColumn"].Value = newText;
+                candidate.RelatedId = newClient.Id;
+                candidate.RelatedType = TaskRelatedType.Client;
+
+                Order order = NewOrderFromQuote(candidate, newClient.Id);
+                _pendingOrders.Add(order);
+                _quoteOrderIds[candidate.Id] = order.Id;
+                candidate.OrderId = order.Id;
+            }
+
+            _dirty = true;
+            Prompt(
+                "Al guardar se dará de alta al cliente, se reasignarán sus tareas, recordatorios y " +
+                "presupuestos y se crearán sus pedidos.",
+                "CRM1 — Convertir en cliente",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            // Un fallo de lectura nunca se presenta como éxito (constitución, 5).
+            Prompt(
+                "No se pudo preparar la conversión del futuro cliente.\n\n" + ex.Message,
+                "CRM1 — Error de datos",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
 
     // Resumen de los datos con los que se dará de alta un cliente convertido.
     private static string ClientSummary(Client client)
@@ -1188,16 +1362,26 @@ public partial class QuoteForm : System.Windows.Forms.Form
             return;
         }
 
-        // Asigna identificadores a las filas que aún no tienen presupuesto
-        // guardado y aplica el pedido generado a cada presupuesto.
+        // Asigna identificadores estables también a las filas nuevas, para
+        // poder enlazar los pedidos que nazcan de la oferta de conversión.
         for (int i = 0; i < quotes.Count; i++)
         {
             if (quotes[i].Id == Guid.Empty)
             {
                 quotes[i].Id = Guid.NewGuid();
             }
-            quotes[i].OrderId = _quoteOrderIds.GetValueOrDefault(quotes[i].Id);
             quotesDataGridView.Rows[rowIndexes[i]].Tag = quotes[i].Id;
+        }
+
+        // Aceptados de futuro cliente sin pedido: ofrecer la conversión en
+        // ese momento (cambio manual del Estado incluido, specs/009 §4.3).
+        OfferConversionForAcceptedProspectQuotes(quotes, rowIndexes);
+
+        // Aplica a cada presupuesto el pedido que tenga generado, incluidos
+        // los creados por la oferta anterior.
+        for (int i = 0; i < quotes.Count; i++)
+        {
+            quotes[i].OrderId = _quoteOrderIds.GetValueOrDefault(quotes[i].Id);
         }
 
         int createdOrders = _pendingOrders.Count;

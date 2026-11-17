@@ -73,7 +73,8 @@
    - **Sí** pero faltan datos → lista de carencias; el presupuesto queda **Aceptado sin pedido**.
    - **No** → Aceptado sin pedido.
 5. **Recuperación**: un presupuesto Aceptado con `OrderId` vacío cambia el botón a **«Crear pedido»**, que repite el punto 3 o 4 (sin re-marcar el estado, que ya es Aceptado).
-6. Todo en memoria hasta **Guardar**; Cancelar sin edición deshace las aceptaciones pendientes (como las conversiones de ContactForm).
+6. **Oferta de conversión al Guardar** (implementado, decisión del usuario 18/11): si al Guardar un presupuesto queda **Aceptado de un futuro cliente sin pedido** —por cambio manual del Estado, fila nueva o un «No» anterior— se avisa («Un futuro cliente no puede tener pedidos… ¿Convertirlo ahora?») y, si se acepta, la conversión en línea se hace en ese momento (carencias si faltan datos, doble confirmación, revinculación y pedidos heredados de todos sus presupuestos Aceptados sin pedido). A un futuro al que ya se ofreció en la sesión no se le vuelve a preguntar; si se declina o faltan datos, el presupuesto queda Aceptado sin pedido como «pendiente de convertir» (§10).
+7. Todo en memoria hasta **Guardar**; Cancelar sin edición deshace las aceptaciones pendientes (como las conversiones de ContactForm).
 7. **Orden de escritura al Guardar** (aceptación con conversión): alta del cliente en `Clients` → revinculación de tareas, recordatorios y presupuestos al cliente nuevo → `Contacts` sin el futuro → pedidos nuevos en `Orders` → `Quotes` con el estado y el `OrderId`. Cada fallo se muestra tal cual ocurrió y no se guarda nada más (constitución, punto 5). Sin conversión: `Orders` primero y `Quotes` después.
 
 ## 5. Reglas de negocio (QuoteService / OrderService)
@@ -105,7 +106,7 @@
 
 ## 10. Caducidad y avisos automáticos (implementado)
 
-- **Validez de 30 días** desde la fecha del presupuesto (decisión del usuario, 18/11/2026); solo aplican a presupuestos **Pendientes** (Aceptados y Descartados nunca avisan ni caducan).
+- **Validez de 30 días** desde la fecha del presupuesto (decisión del usuario, 18/11/2026); aplican los **Pendientes** y también los **Aceptados de un futuro cliente sin pedido** («pendiente de convertir»: mientras el futuro no se convierta, el presupuesto corre la misma validez; Aceptados con pedido, Descartados y fechas futuras nunca avisan ni caducan).
 - **Avisos derivados**, calculados al vuelo desde la fecha del presupuesto (`QuoteService.GetExpiring`) — no se crean filas en el módulo Recordatorios y no hay nada que limpiar si la fecha cambia. Días de aviso y mensaje:
 
 | Día (desde la fecha) | Aviso |
@@ -117,7 +118,7 @@
 | 29 | «caduca mañana» |
 | 30 | «¡último día de validez!» |
 
-- **Día 31 o posterior: pasa a Descartado automáticamente** (`QuoteService.GetExpired`): el programa lo escribe directamente en la base al abrir la aplicación (sin esperar a Guardar) y lo informa con la lista de lo descartado. Los históricos previos a la regla también la cumplen.
+- **Día 31 o posterior: pasa a Descartado automáticamente** (`QuoteService.GetExpired`): el programa lo escribe directamente en la base al abrir la aplicación (sin esperar a Guardar) y lo informa con la lista de lo descartado. Los históricos previos a la regla también la cumplen. Un Aceptado «pendiente de convertir» que caduca se informa como «caducado sin convertir el futuro cliente: pasa a Descartado», y sus avisos de ventana llevan el prefijo «pendiente de convertir:» — cadencia 15/7/3/2/1 días antes y último día, **derivada** (sin filas en el módulo Recordatorios; al convertir el futuro o caducar el presupuesto, el aviso desaparece solo; decisión del usuario, 18/11).
 - **Cuándo se comprueba**: al **abrir** y al **cerrar** la aplicación (para no perder ningún aviso si algo caduca con la app abierta), junto a los avisos de recordatorios de specs/007 §7; un único diálogo combina caducados y por caducar, cada línea con descripción/referencia, registro vinculado y días restantes. Nunca bloquea el cierre; un fallo de lectura o escritura es un error visible y la aplicación sigue (constitución, punto 5).
 - Los avisos de recordatorios propiamente dichos siguen en specs/007; este mecanismo es independiente y derivado.
 

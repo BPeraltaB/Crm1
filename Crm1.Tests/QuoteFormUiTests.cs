@@ -516,6 +516,117 @@ public sealed class QuoteFormUiTests
     }
 
     [Fact]
+    public void Modifying_a_historical_prospect_quote_to_accepted_offers_conversion_on_save()
+    {
+        // Aceptado a mano un presupuesto de futuro: al Guardar se ofrece la
+        // conversión en ese momento (specs/009 §4.3).
+        Contact convertible = Fixtures.ConvertibleContact();
+        Quote oldPending = QuoteOf(convertible.Id, DateTime.Today.AddDays(-20), TaskRelatedType.Prospect);
+        UiTestEnvironment.WriteClients(Fixtures.Client("Luis", "23456781R"));
+        UiTestEnvironment.WriteContacts(convertible);
+        UiTestEnvironment.WriteQuotes(oldPending);
+        UiTestEnvironment.WriteOrders();
+
+        WinFormsSta.Run(() =>
+        {
+            // Oferta + doble confirmación + info + guardado correcto.
+            var recorder = new PromptRecorder(
+                DialogResult.Yes, DialogResult.Yes, DialogResult.Yes, DialogResult.Yes,
+                DialogResult.OK, DialogResult.OK);
+            using var form = new QuoteForm(recorder.Answer);
+            DataGridView grid = FormAccess.Grid(form, "quotesDataGridView");
+
+            grid.CurrentCell = grid.Rows[0].Cells["quoteDateColumn"];
+            FormAccess.Click(form, "ModifyButton_Click");
+            grid.Rows[0].Cells["statusColumn"].Value = "Aceptado";
+
+            FormAccess.Click(form, "SaveButton_Click");
+
+            // El futuro desaparece y su presupuesto pasa al cliente nuevo con pedido.
+            Assert.Empty(UiTestEnvironment.ReadContacts());
+            Client converted = UiTestEnvironment.ReadClients().Single(client => client.TaxId == "11111111H");
+            Quote saved = Assert.Single(UiTestEnvironment.ReadQuotes());
+            Assert.Equal(QuoteStatus.Accepted, saved.Status);
+            Assert.Equal(converted.Id, saved.RelatedId);
+            Assert.Equal(TaskRelatedType.Client, saved.RelatedType);
+
+            Order order = Assert.Single(UiTestEnvironment.ReadOrders());
+            Assert.Equal(converted.Id, order.ClientId);
+            Assert.Equal(DateTime.Today, order.OrderDate);
+            Assert.Equal(order.Id, saved.OrderId);
+        });
+    }
+
+    [Fact]
+    public void Save_time_conversion_offer_declined_leaves_it_accepted_and_does_not_reask()
+    {
+        Contact convertible = Fixtures.ConvertibleContact();
+        Quote oldPending = QuoteOf(convertible.Id, DateTime.Today.AddDays(-20), TaskRelatedType.Prospect);
+        UiTestEnvironment.WriteClients(Fixtures.Client("Luis", "23456781R"));
+        UiTestEnvironment.WriteContacts(convertible);
+        UiTestEnvironment.WriteQuotes(oldPending);
+        UiTestEnvironment.WriteOrders();
+
+        WinFormsSta.Run(() =>
+        {
+            var recorder = new PromptRecorder(DialogResult.No, DialogResult.OK, DialogResult.OK);
+            using var form = new QuoteForm(recorder.Answer);
+            DataGridView grid = FormAccess.Grid(form, "quotesDataGridView");
+
+            grid.CurrentCell = grid.Rows[0].Cells["quoteDateColumn"];
+            FormAccess.Click(form, "ModifyButton_Click");
+            grid.Rows[0].Cells["statusColumn"].Value = "Aceptado";
+
+            FormAccess.Click(form, "SaveButton_Click");
+
+            // Sin conversión: queda Aceptado sin pedido y el futuro sigue.
+            Quote saved = Assert.Single(UiTestEnvironment.ReadQuotes());
+            Assert.Equal(QuoteStatus.Accepted, saved.Status);
+            Assert.Null(saved.OrderId);
+            Assert.Empty(UiTestEnvironment.ReadOrders());
+            Assert.Single(UiTestEnvironment.ReadContacts());
+
+            // Un segundo Guardar no vuelve a ofrecer la conversión.
+            FormAccess.Click(form, "SaveButton_Click");
+            Assert.Equal(3, recorder.Messages.Count);
+            Assert.Contains("1 presupuesto(s)", recorder.Messages[2]);
+        });
+    }
+
+    [Fact]
+    public void Save_time_conversion_with_missing_data_shows_carencias()
+    {
+        Contact incomplete = Fixtures.Contact("Elena");
+        Quote oldPending = QuoteOf(incomplete.Id, DateTime.Today.AddDays(-20), TaskRelatedType.Prospect);
+        UiTestEnvironment.WriteClients(Fixtures.Client("Luis", "23456781R"));
+        UiTestEnvironment.WriteContacts(incomplete);
+        UiTestEnvironment.WriteQuotes(oldPending);
+        UiTestEnvironment.WriteOrders();
+
+        WinFormsSta.Run(() =>
+        {
+            var recorder = new PromptRecorder(DialogResult.Yes, DialogResult.OK, DialogResult.OK);
+            using var form = new QuoteForm(recorder.Answer);
+            DataGridView grid = FormAccess.Grid(form, "quotesDataGridView");
+
+            grid.CurrentCell = grid.Rows[0].Cells["quoteDateColumn"];
+            FormAccess.Click(form, "ModifyButton_Click");
+            grid.Rows[0].Cells["statusColumn"].Value = "Aceptado";
+
+            FormAccess.Click(form, "SaveButton_Click");
+
+            // Carencias visibles; el presupuesto queda Aceptado sin pedido y
+            // el futuro sin convertir (pendiente de convertir para la caducidad).
+            Assert.Contains("no puede convertirse", recorder.Messages[1]);
+            Quote saved = Assert.Single(UiTestEnvironment.ReadQuotes());
+            Assert.Equal(QuoteStatus.Accepted, saved.Status);
+            Assert.Null(saved.OrderId);
+            Assert.Empty(UiTestEnvironment.ReadOrders());
+            Assert.Single(UiTestEnvironment.ReadContacts());
+        });
+    }
+
+    [Fact]
     public void ShowQuotesOf_filters_the_view_and_saving_keeps_hidden_quotes()    {
         Client ana = Fixtures.Client("Ana", "12345678Z");
         Client luis = Fixtures.Client("Luis", "23456781R");

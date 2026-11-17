@@ -145,17 +145,18 @@ public sealed class QuoteService
     };
 
     /// <summary>
-    /// Presupuestos Pendientes que están hoy en un día de aviso (15, 23, 27,
-    /// 28, 29 o 30), con los días que les faltan para caducar (0 = último
-    /// día). Aceptados, Descartados y fechas futuras nunca avisan; la lista
-    /// sale ordenada por fecha.
+    /// Presupuestos que están hoy en un día de aviso (15, 23, 27, 28, 29 o
+    /// 30), con los días que les faltan para caducar (0 = último día).
+    /// Aceptados, Descartados y fechas futuras nunca avisan; los Aceptados de
+    /// un futuro cliente sin pedido avisan como «pendiente de convertir»
+    /// (specs/009 §10); la lista sale ordenada por fecha.
     /// </summary>
     public static List<(Quote Quote, int DaysLeft)> GetExpiring(IEnumerable<Quote> quotes, DateTime today)
     {
         var expiring = new List<(Quote Quote, int DaysLeft)>();
         foreach (Quote quote in quotes)
         {
-            if (quote.Status != QuoteStatus.Pending)
+            if (!IsActiveForExpiry(quote))
             {
                 continue;
             }
@@ -171,13 +172,25 @@ public sealed class QuoteService
     }
 
     /// <summary>
-    /// Presupuestos Pendientes con la validez agotada (día 31 o posterior):
-    /// el programa los pasa a Descartado automáticamente (specs/009 §10),
-    /// escribiendo en la base sin esperar a Guardar.
+    /// Presupuestos con la validez agotada (día 31 o posterior): el programa
+    /// los pasa a Descartado automáticamente (specs/009 §10), escribiendo en
+    /// la base sin esperar a Guardar. Incluye los Pendientes y los Aceptados
+    /// de un futuro cliente sin pedido («pendiente de convertir»: sin
+    /// cliente a los 30 días, el presupuesto se descarta).
     /// </summary>
     public static List<Quote> GetExpired(IEnumerable<Quote> quotes, DateTime today) =>
-        quotes.Where(quote => quote.Status == QuoteStatus.Pending
+        quotes.Where(quote => IsActiveForExpiry(quote)
                 && (today.Date - quote.QuoteDate.Date).Days > ValidityDays)
             .OrderBy(quote => quote.QuoteDate)
             .ToList();
+
+    // Un presupuesto está «activo para la caducidad» si es Pendiente o si es
+    // un Aceptado de futuro cliente sin pedido: mientras no se convierta el
+    // futuro, el presupuesto corre la misma validez (decisión del usuario,
+    // 18/11, specs/009 §10).
+    private static bool IsActiveForExpiry(Quote quote) =>
+        quote.Status == QuoteStatus.Pending
+        || (quote.Status == QuoteStatus.Accepted
+            && quote.RelatedType == TaskRelatedType.Prospect
+            && quote.OrderId is null);
 }

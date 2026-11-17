@@ -519,13 +519,17 @@ public partial class MainForm : System.Windows.Forms.Form
             {
                 lines.Add(
                     $"• {QuoteDisplayName(quote)} de {names.GetValueOrDefault(quote.RelatedId, "—")} — " +
-                    $"{quote.QuoteDate:dd/MM/yyyy} — caducado: pasa a Descartado");
+                    $"{quote.QuoteDate:dd/MM/yyyy} — " +
+                    (quote.Status == QuoteStatus.Accepted
+                        ? "caducado sin convertir el futuro cliente: pasa a Descartado"
+                        : "caducado: pasa a Descartado"));
             }
             foreach ((Quote quote, int daysLeft) in expiring)
             {
+                string pendingConversion = quote.Status == QuoteStatus.Accepted ? "pendiente de convertir: " : string.Empty;
                 lines.Add(
                     $"• {QuoteDisplayName(quote)} de {names.GetValueOrDefault(quote.RelatedId, "—")} — " +
-                    $"{quote.QuoteDate:dd/MM/yyyy} — " +
+                    $"{quote.QuoteDate:dd/MM/yyyy} — " + pendingConversion +
                     (daysLeft == 0 ? "¡último día de validez!" : daysLeft == 1 ? "caduca mañana" : $"caduca en {daysLeft} días"));
             }
 

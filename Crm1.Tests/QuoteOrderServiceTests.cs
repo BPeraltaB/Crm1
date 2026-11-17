@@ -264,6 +264,44 @@ public sealed class QuoteOrderServiceTests
         Assert.Single(expired);
     }
 
+    [Fact]
+    public void Expiry_treats_accepted_prospect_quotes_without_order_as_pending_conversion()
+    {
+        // Aceptado de futuro sin pedido: avisa y caduca como un Pendiente.
+        Quote pendingConversion = ExpiryQuote(27, QuoteStatus.Accepted);
+        pendingConversion.RelatedType = TaskRelatedType.Prospect;
+
+        List<(Quote Quote, int DaysLeft)> expiring =
+            QuoteService.GetExpiring(new[] { pendingConversion }, DateTime.Today);
+        (Quote quote, int daysLeft) = Assert.Single(expiring);
+        Assert.Equal(3, daysLeft);
+
+        // Con pedido generado ya no avisa: la conversión se completó.
+        Quote withOrder = ExpiryQuote(27, QuoteStatus.Accepted);
+        withOrder.RelatedType = TaskRelatedType.Prospect;
+        withOrder.OrderId = Guid.NewGuid();
+        Assert.Empty(QuoteService.GetExpiring(new[] { withOrder }, DateTime.Today));
+
+        // Y un Aceptado de cliente tampoco (sus pedidos nacen siempre).
+        Quote clientAccepted = ExpiryQuote(27, QuoteStatus.Accepted);
+        Assert.Empty(QuoteService.GetExpiring(new[] { clientAccepted }, DateTime.Today));
+    }
+
+    [Fact]
+    public void GetExpired_discards_accepted_prospect_quotes_without_order_past_day_30()
+    {
+        Quote pendingConversion = ExpiryQuote(40, QuoteStatus.Accepted);
+        pendingConversion.RelatedType = TaskRelatedType.Prospect;
+
+        List<Quote> expired = QuoteService.GetExpired(new[] { pendingConversion }, DateTime.Today);
+        Assert.Single(expired);
+
+        Quote withOrder = ExpiryQuote(40, QuoteStatus.Accepted);
+        withOrder.RelatedType = TaskRelatedType.Prospect;
+        withOrder.OrderId = Guid.NewGuid();
+        Assert.Empty(QuoteService.GetExpired(new[] { withOrder }, DateTime.Today));
+    }
+
     // Totales con abonos (specs/009 §4.2).
     [Fact]
     public void Totals_subtract_credit_notes_from_orders()
