@@ -93,6 +93,7 @@ Reglas de aviso (**implementadas** en `ReminderService.GetDueOnOpen`/`GetDueOnCl
 - **Repetición** (diaria/semanal/mensual), **posponer** (snooze), **aviso anticipado** («avísame 2 días antes») y **aviso en vivo** a la hora exacta con la app abierta (timer): la v1 comprueba solo al abrir y al cerrar.
 - Descartar recordatorios desde el propio aviso.
 - Vínculo con oportunidades (módulo inexistente). La inclusión en la búsqueda global ya está implementada (specs/004 §3-5).
+- Los avisos de caducidad de presupuestos (specs/009 §10) son **derivados** de la fecha del presupuesto y no viven en la tabla `Reminders`: este módulo no cambia.
 
 ## 9. Pruebas
 

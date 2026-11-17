@@ -299,13 +299,15 @@ public partial class MainForm : System.Windows.Forms.Form
 
     /// <summary>
     /// Nada más mostrar la ventana, avisa de los recordatorios activos
-    /// vencidos o de hoy (specs/007 §7); sin nada que avisar no muestra
-    /// diálogo. La regla vive en ReminderService (constitución, punto 3).
+    /// vencidos o de hoy (specs/007 §7) y procesa la caducidad de los
+    /// presupuestos (specs/009 §10); sin nada que avisar no muestra
+    /// diálogo. Las reglas viven en los servicios (constitución, punto 3).
     /// </summary>
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
         ShowRemindersDueOnOpen();
+        ProcessQuoteExpiryNotices();
     }
 
     /// <summary>
@@ -468,7 +470,91 @@ public partial class MainForm : System.Windows.Forms.Form
         // Aviso informativo de recordatorios justo antes de cerrar (specs/007
         // §7), ya confirmada la salida: nunca bloquea el cierre.
         ShowRemindersDueOnClose();
+
+        // Caducidad y avisos de presupuestos también al cerrar, para no
+        // perder ninguno si algo caduca con la aplicación abierta (specs/009
+        // §10); nunca bloquea el cierre.
+        ProcessQuoteExpiryNotices();
     }
+
+    /// <summary>
+    /// Caduca los presupuestos Pendientes con la validez agotada (día 31:
+    /// pasan a Descartado automáticamente, escrito directamente en la base,
+    /// sin esperar a Guardar) y avisa de los que están en un día de aviso
+    /// (15, 23, 27, 28, 29 y 30), solo Pendientes (specs/009 §10). Se
+    /// comprueba al abrir y al cerrar la aplicación; nunca bloquea y un
+    /// fallo de lectura es error visible sin impedir seguir (constitución,
+    /// punto 5).
+    /// </summary>
+    private void ProcessQuoteExpiryNotices()
+    {
+        try
+        {
+            SqlDataStore store = new();
+            List<Quote> quotes = store.LoadQuotes();
+            DateTime today = DateTime.Today;
+
+            List<Quote> expired = QuoteService.GetExpired(quotes, today);
+            if (expired.Count > 0)
+            {
+                foreach (Quote quote in expired)
+                {
+                    quote.Status = QuoteStatus.Dismissed;
+                }
+                store.SaveQuotes(quotes);
+            }
+
+            List<(Quote Quote, int DaysLeft)> expiring = QuoteService.GetExpiring(quotes, today);
+            if (expired.Count == 0 && expiring.Count == 0)
+            {
+                return;
+            }
+
+            // Registro vinculado con el mismo prefijo que en las tablas.
+            Dictionary<Guid, string> names = SearchService.BuildRelatedNames(
+                store.LoadClients(), store.LoadContacts());
+
+            var lines = new List<string>();
+            foreach (Quote quote in expired)
+            {
+                lines.Add(
+                    $"• {QuoteDisplayName(quote)} de {names.GetValueOrDefault(quote.RelatedId, "—")} — " +
+                    $"{quote.QuoteDate:dd/MM/yyyy} — caducado: pasa a Descartado");
+            }
+            foreach ((Quote quote, int daysLeft) in expiring)
+            {
+                lines.Add(
+                    $"• {QuoteDisplayName(quote)} de {names.GetValueOrDefault(quote.RelatedId, "—")} — " +
+                    $"{quote.QuoteDate:dd/MM/yyyy} — " +
+                    (daysLeft == 0 ? "¡último día de validez!" : daysLeft == 1 ? "caduca mañana" : $"caduca en {daysLeft} días"));
+            }
+
+            string intro = expired.Count > 0
+                ? $"{expired.Count} presupuesto(s) han caducado y pasado a Descartado automáticamente"
+                    + (expiring.Count > 0 ? $" y hay {expiring.Count} por caducar" : string.Empty)
+                : $"{expiring.Count} presupuesto(s) por caducar";
+            MessageBox.Show(this,
+                $"{intro}:\n\n{string.Join("\n", lines)}",
+                "CRM1 — Presupuestos",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            // Fallo de lectura o escritura: error visible, la aplicación sigue
+            // (constitución, punto 5).
+            MessageBox.Show(this,
+                "No se pudieron comprobar los presupuestos caducados o por caducar.\n\n" + ex.Message,
+                "CRM1 — Error de datos",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    // Nombre visible de un presupuesto para los avisos: descripción o
+    // referencia, o una identificación neutra si no hay nada.
+    private static string QuoteDisplayName(Quote quote) =>
+        quote.Description.Length > 0 ? quote.Description
+        : quote.Reference.Length > 0 ? quote.Reference
+        : "Presupuesto";
 
     /// <summary>
     /// Actualiza el reloj de la barra de estado en cada intervalo del temporizador.

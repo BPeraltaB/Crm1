@@ -100,8 +100,26 @@
 
 ## 8. Fuera de alcance
 
-- Generar el documento del presupuesto o del pedido (vive en el programa de administración); líneas de detalle/artículos; presupuestos caducados por antigüedad; vínculo con oportunidades (módulo inexistente); exportación.
+- Generar el documento del presupuesto o del pedido (vive en el programa de administración); líneas de detalle/artículos; vínculo con oportunidades (módulo inexistente); exportación.
 - Descuento automático del stock, facturación y IVA.
+
+## 10. Caducidad y avisos automáticos (implementado)
+
+- **Validez de 30 días** desde la fecha del presupuesto (decisión del usuario, 18/11/2026); solo aplican a presupuestos **Pendientes** (Aceptados y Descartados nunca avisan ni caducan).
+- **Avisos derivados**, calculados al vuelo desde la fecha del presupuesto (`QuoteService.GetExpiring`) — no se crean filas en el módulo Recordatorios y no hay nada que limpiar si la fecha cambia. Días de aviso y mensaje:
+
+| Día (desde la fecha) | Aviso |
+|---|---|
+| 15 | «caduca en 15 días» |
+| 23 | «caduca en 7 días» |
+| 27 | «caduca en 3 días» |
+| 28 | «caduca en 2 días» |
+| 29 | «caduca mañana» |
+| 30 | «¡último día de validez!» |
+
+- **Día 31 o posterior: pasa a Descartado automáticamente** (`QuoteService.GetExpired`): el programa lo escribe directamente en la base al abrir la aplicación (sin esperar a Guardar) y lo informa con la lista de lo descartado. Los históricos previos a la regla también la cumplen.
+- **Cuándo se comprueba**: al **abrir** y al **cerrar** la aplicación (para no perder ningún aviso si algo caduca con la app abierta), junto a los avisos de recordatorios de specs/007 §7; un único diálogo combina caducados y por caducar, cada línea con descripción/referencia, registro vinculado y días restantes. Nunca bloquea el cierre; un fallo de lectura o escritura es un error visible y la aplicación sigue (constitución, punto 5).
+- Los avisos de recordatorios propiamente dichos siguen en specs/007; este mecanismo es independiente y derivado.
 
 ## 9. Pruebas (planificadas)
 

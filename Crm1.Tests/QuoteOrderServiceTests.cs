@@ -164,8 +164,90 @@ public sealed class QuoteOrderServiceTests
             NewOrderService().Validate(ValidOrder(o => o.ClientId = Guid.NewGuid()))!.Field);
     }
 
-    // Totales con abonos (specs/009 §4.2).
+    // Caducidad y avisos automáticos (specs/009 §10, decisión del 18/11).
 
+    // Presupuesto Pendiente con la antigüedad indicada.
+    private static Quote ExpiryQuote(int daysOld, QuoteStatus status = QuoteStatus.Pending) => new()
+    {
+        Id = Guid.NewGuid(),
+        QuoteDate = DateTime.Today.AddDays(-daysOld),
+        Amount = 100m,
+        Description = "Mobiliario de oficina",
+        Status = status,
+        RelatedId = Guid.NewGuid(),
+        RelatedType = TaskRelatedType.Client
+    };
+
+    [Theory]
+    [InlineData(15, 15)]
+    [InlineData(23, 7)]
+    [InlineData(27, 3)]
+    [InlineData(28, 2)]
+    [InlineData(29, 1)]
+    [InlineData(30, 0)]
+    public void GetExpiring_notifies_on_each_warning_day_with_days_left(int daysOld, int daysLeft)
+    {
+        Quote quote = ExpiryQuote(daysOld);
+
+        List<(Quote Quote, int DaysLeft)> expiring =
+            QuoteService.GetExpiring(new[] { quote }, DateTime.Today);
+
+        (Quote found, int left) = Assert.Single(expiring);
+        Assert.Equal(quote.Id, found.Id);
+        Assert.Equal(daysLeft, left);
+    }
+
+    [Theory]
+    [InlineData(14)]
+    [InlineData(16)]
+    [InlineData(22)]
+    [InlineData(24)]
+    [InlineData(26)]
+    [InlineData(31)]
+    public void GetExpiring_skips_days_outside_the_warning_window(int daysOld)
+    {
+        Assert.Empty(QuoteService.GetExpiring(new[] { ExpiryQuote(daysOld) }, DateTime.Today));
+    }
+
+    [Fact]
+    public void GetExpiring_ignores_non_pending_and_future_quotes()
+    {
+        Quote accepted = ExpiryQuote(27, QuoteStatus.Accepted);
+        Quote dismissed = ExpiryQuote(28, QuoteStatus.Dismissed);
+        Quote future = ExpiryQuote(-5);
+
+        Assert.Empty(QuoteService.GetExpiring(new[] { accepted, dismissed, future }, DateTime.Today));
+    }
+
+    [Fact]
+    public void GetExpired_returns_only_pending_quotes_past_day_30()
+    {
+        Quote day31 = ExpiryQuote(31);
+        Quote day60 = ExpiryQuote(60);
+        Quote day30 = ExpiryQuote(30);
+        Quote acceptedOld = ExpiryQuote(60, QuoteStatus.Accepted);
+        Quote future = ExpiryQuote(-3);
+
+        List<Quote> expired = QuoteService.GetExpired(
+            new[] { day31, day60, day30, acceptedOld, future }, DateTime.Today);
+
+        Assert.Equal(2, expired.Count);
+        Assert.Contains(expired, quote => quote.Id == day31.Id);
+        Assert.Contains(expired, quote => quote.Id == day60.Id);
+    }
+
+    [Fact]
+    public void GetExpired_includes_prospect_quotes_too()
+    {
+        Quote prospectQuote = ExpiryQuote(45);
+        prospectQuote.RelatedType = TaskRelatedType.Prospect;
+
+        List<Quote> expired = QuoteService.GetExpired(new[] { prospectQuote }, DateTime.Today);
+
+        Assert.Single(expired);
+    }
+
+    // Totales con abonos (specs/009 §4.2).
     [Fact]
     public void Totals_subtract_credit_notes_from_orders()
     {

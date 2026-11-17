@@ -121,4 +121,63 @@ public sealed class QuoteService
         }
         return errors;
     }
+
+    // ------------------------------------------------------------------
+    // Caducidad y avisos automáticos (specs/009 §10, decisión del usuario
+    // 18/11/2026): validez de 30 días, avisos derivados en los días 15, 23,
+    // 27, 28, 29 y 30 mientras el presupuesto siga Pendiente, y paso a
+    // Descartado en el día 31.
+    // ------------------------------------------------------------------
+
+    /// <summary>Días de validez de un presupuesto (el 31 pasa a Descartado).</summary>
+    public const int ValidityDays = 30;
+
+    // Días transcurridos desde la fecha del presupuesto en los que salta el
+    // aviso de caducidad, con los días que faltan para caducar.
+    private static readonly Dictionary<int, int> ExpiryNoticeDays = new()
+    {
+        [15] = 15,
+        [23] = 7,
+        [27] = 3,
+        [28] = 2,
+        [29] = 1,
+        [30] = 0
+    };
+
+    /// <summary>
+    /// Presupuestos Pendientes que están hoy en un día de aviso (15, 23, 27,
+    /// 28, 29 o 30), con los días que les faltan para caducar (0 = último
+    /// día). Aceptados, Descartados y fechas futuras nunca avisan; la lista
+    /// sale ordenada por fecha.
+    /// </summary>
+    public static List<(Quote Quote, int DaysLeft)> GetExpiring(IEnumerable<Quote> quotes, DateTime today)
+    {
+        var expiring = new List<(Quote Quote, int DaysLeft)>();
+        foreach (Quote quote in quotes)
+        {
+            if (quote.Status != QuoteStatus.Pending)
+            {
+                continue;
+            }
+
+            int elapsed = (today.Date - quote.QuoteDate.Date).Days;
+            if (ExpiryNoticeDays.TryGetValue(elapsed, out int daysLeft))
+            {
+                expiring.Add((quote, daysLeft));
+            }
+        }
+
+        return expiring.OrderBy(item => item.Quote.QuoteDate).ToList();
+    }
+
+    /// <summary>
+    /// Presupuestos Pendientes con la validez agotada (día 31 o posterior):
+    /// el programa los pasa a Descartado automáticamente (specs/009 §10),
+    /// escribiendo en la base sin esperar a Guardar.
+    /// </summary>
+    public static List<Quote> GetExpired(IEnumerable<Quote> quotes, DateTime today) =>
+        quotes.Where(quote => quote.Status == QuoteStatus.Pending
+                && (today.Date - quote.QuoteDate.Date).Days > ValidityDays)
+            .OrderBy(quote => quote.QuoteDate)
+            .ToList();
 }
