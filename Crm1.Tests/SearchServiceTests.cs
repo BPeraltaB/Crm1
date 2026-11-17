@@ -272,6 +272,95 @@ public sealed class SearchServiceTests
         RelatedType = relatedType
     };
 
+    // Pruebas de la ampliación a presupuestos y pedidos (specs/009).
+
+    [Fact]
+    public void Search_QuoteMatchesByDescription_Reference_And_SpanishPrice()
+    {
+        Client ana = NewClient("Ana");
+        var quote = new Quote
+        {
+            Id = Guid.NewGuid(),
+            QuoteDate = new DateTime(2026, 11, 10),
+            Amount = 1234.56m,
+            Reference = "P-2026-0142",
+            Description = "Mobiliario de oficina",
+            Status = QuoteStatus.Accepted,
+            RelatedId = ana.Id,
+            RelatedType = TaskRelatedType.Client
+        };
+        var empty = Array.Empty<Crm1.WindowsForms.Models.Order>();
+
+        SearchMatch match = Assert.Single(SearchService.Search(
+            new List<Client> { ana }, new List<Contact>(), Array.Empty<Task>(), Array.Empty<Reminder>(),
+            new List<Quote> { quote }, empty, "mobiliario"));
+        Assert.Equal(SearchModule.Quote, match.Module);
+        Assert.Equal("(Cliente) Ana", match.RelatedName);
+
+        Assert.Single(SearchService.Search(
+            new List<Client> { ana }, new List<Contact>(), Array.Empty<Task>(), Array.Empty<Reminder>(),
+            new List<Quote> { quote }, empty, "1.234,56"));
+        Assert.Single(SearchService.Search(
+            new List<Client> { ana }, new List<Contact>(), Array.Empty<Task>(), Array.Empty<Reminder>(),
+            new List<Quote> { quote }, empty, "P-2026-0142"));
+        Assert.Single(SearchService.Search(
+            new List<Client> { ana }, new List<Contact>(), Array.Empty<Task>(), Array.Empty<Reminder>(),
+            new List<Quote> { quote }, empty, "aceptado"));
+    }
+
+    [Fact]
+    public void Search_OrderMatchesByKindLabel_and_returns_modules_in_full_order()
+    {
+        Client ana = NewClient("Ana");
+        Contact contact = NewContact("Ana");
+        Task task = NewTask("Hablar con Ana", ana.Id, TaskRelatedType.Client);
+        Reminder reminder = new()
+        {
+            Id = Guid.NewGuid(),
+            Subject = "Llamar a Ana",
+            RemindAt = new DateTime(2026, 11, 20, 10, 30, 0),
+            RelatedId = contact.Id,
+            RelatedType = TaskRelatedType.Prospect
+        };
+        Quote quote = new()
+        {
+            Id = Guid.NewGuid(),
+            QuoteDate = new DateTime(2026, 11, 10),
+            Amount = 100m,
+            Description = "Presupuesto de Ana",
+            RelatedId = ana.Id,
+            RelatedType = TaskRelatedType.Client
+        };
+        var creditNote = new Crm1.WindowsForms.Models.Order
+        {
+            Id = Guid.NewGuid(),
+            Kind = OrderKind.CreditNote,
+            OrderDate = new DateTime(2026, 11, 12),
+            Amount = 50m,
+            Description = "Abono de Ana",
+            ClientId = ana.Id
+        };
+
+        // El tipo se busca por su etiqueta en español («Abono»).
+        Assert.Single(SearchService.Search(
+            new List<Client> { ana }, new List<Contact>(), Array.Empty<Task>(), Array.Empty<Reminder>(),
+            Array.Empty<Quote>(), new List<Crm1.WindowsForms.Models.Order> { creditNote }, "abono"));
+
+        // Orden completo: cliente, futuro, tarea, recordatorio, presupuesto, pedido.
+        IReadOnlyList<SearchMatch> matches = SearchService.Search(
+            new List<Client> { ana }, new List<Contact> { contact },
+            new List<Task> { task }, new List<Reminder> { reminder },
+            new List<Quote> { quote }, new List<Crm1.WindowsForms.Models.Order> { creditNote }, "ana");
+
+        Assert.Equal(6, matches.Count);
+        Assert.Equal(SearchModule.Client, matches[0].Module);
+        Assert.Equal(SearchModule.Contact, matches[1].Module);
+        Assert.Equal(SearchModule.Task, matches[2].Module);
+        Assert.Equal(SearchModule.Reminder, matches[3].Module);
+        Assert.Equal(SearchModule.Quote, matches[4].Module);
+        Assert.Equal(SearchModule.Order, matches[5].Module);
+    }
+
     // Cliente de prueba con datos opcionales.
     private static Client NewClient(
         string firstName,

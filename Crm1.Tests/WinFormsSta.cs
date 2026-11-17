@@ -35,7 +35,7 @@ internal static class WinFormsSta
 
         if (error is not null)
         {
-            throw error;
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error).Throw();
         }
 
         return result;

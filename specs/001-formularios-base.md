@@ -34,13 +34,13 @@ Crear formularios Windows Forms **en blanco**: sin lógica, sin controles y sin 
 | 5 | Oportunidades             | `OpportunityForm` | Pendiente          |
 | 6 | Tareas                    | `TaskForm`        | Creado (specs/005) |
 | 7 | Recordatorios             | `ReminderForm`    | Creado (specs/007) |
-| 8 | Presupuestos              | `QuoteForm`       | Pendiente          |
-| 9 | Pedidos                   | `OrderForm`       | Pendiente          |
+| 8 | Presupuestos              | `QuoteForm`       | Creado (specs/009) |
+| 9 | Pedidos                   | `OrderForm`       | Creado (specs/009) |
 | 10| Servicios                 | `ServiceForm`     | Pendiente          |
 | 11| Ventas                    | `SaleForm`        | Pendiente          |
 | 12| Historial                 | `HistoryForm`     | Pendiente          |
 
-Cada formulario se marcará como creado en esta tabla al entregarse; `ClientForm` está creado y diseñado según specs/002-formulario-clientes.md, `ContactForm` (Futuros clientes) según specs/003-formulario-futuros-clientes.md, `SearchForm` (Búsqueda) según specs/004-busqueda-global.md y `TaskForm` (Tareas) según specs/005-tareas.md (solo diseño, sin lógica ni eventos). `ReminderForm` (Recordatorios) nació en blanco según esta especificación y hoy está especificado e implementado en specs/007-recordatorios.md.
+Cada formulario se marcará como creado en esta tabla al entregarse; `ClientForm` está creado y diseñado según specs/002-formulario-clientes.md, `ContactForm` (Futuros clientes) según specs/003-formulario-futuros-clientes.md, `SearchForm` (Búsqueda) según specs/004-busqueda-global.md y `TaskForm` (Tareas) según specs/005-tareas.md (solo diseño, sin lógica ni eventos). `ReminderForm` (Recordatorios) nació en blanco según esta especificación y hoy está especificado e implementado en specs/007-recordatorios.md. `QuoteForm` (Presupuestos) y `OrderForm` (Pedidos) están especificados e implementados en specs/009-presupuestos-y-pedidos.md.
 
 ## 5. Fuera de alcance
 

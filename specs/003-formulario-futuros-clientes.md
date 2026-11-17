@@ -29,7 +29,7 @@ Formulario del módulo de futuros clientes: personas o empresas en seguimiento a
 | `convertButton`   | Convertir en cliente | Implementado (sección 6) |
 | `tasksButton`     | Tareas    | Implementado (filtra specs/005) |
 
-- Barra de información (`filterPanel`, 40 px, fondo #F3F4F6) bajo la botonera con el contador `counterLabel` "Mostrando X de Y". Sin filtro local: **la búsqueda se realiza desde el formulario principal** (búsqueda global, specs/004).
+- Barra de búsqueda (`filterPanel`, 40 px, fondo #F3F4F6) bajo la botonera: cuadro de texto `searchTextBox` con **búsqueda en vivo** (coincidencia parcial, sin mayúsculas ni tildes, en las 13 columnas; la fecha vacía no se busca) y contador `counterLabel` "Mostrando X de Y" según lo filtrado. Bloqueada durante la edición, igual que la botonera; si el futuro cliente actual queda oculto, la marca se retira. Guardar conserva también las filas ocultas por la búsqueda. Sin desplegable de estado (decisión del 16/11: solo la caja).
 
 - `Id` no se muestra; viaja en `Tag` de cada fila. Todas las filas están en **solo lectura** salvo la fila activa para edición (sección 6). Selección por fila completa, **columnas con ancho automático al contenido** (`AllCells`) y **barra de desplazamiento horizontal** cuando el conjunto no cabe. Las celdas se ven **siempre blancas** (`SelectionBackColor` blanco): la fila seleccionada se marca con un **borde grueso (3 px, gris pizarra) alrededor de toda la fila**, nunca con un tinte azul.
 
@@ -73,7 +73,7 @@ Modelo `Contact` con los mismos campos que `Client` (specs/000), con `Status` de
 - **Navegación desde la búsqueda global (specs/004)**: `IsEditing` expone si hay una edición en curso y `SelectContactById(Guid)` marca como futuro cliente actual el indicado y desplaza la tabla hasta su fila; los usa `MainForm` al elegir un resultado de búsqueda. Con edición en curso o registro ausente, la búsqueda avisa y no navega.
 - **Filas deshabilitadas durante la edición**: mientras hay una fila activa, las demás se ven atenuadas en gris y no se pueden seleccionar (ni con clic ni con teclado: la selección y la celda actual vuelven a la fila en edición); se rehabilitan al guardar con éxito o al cancelar.
 - **Estados de la botonera**: sin edición → Nuevo/Modificar/Eliminar/Tareas/Guardar (y Convertir) activos y Cancelar inactivo; en edición → Nuevo/Modificar/Eliminar/Tareas (y Convertir) inactivos y Cancelar activo; error de carga (catálogo o JSON) → todo inactivo. La ordenación por cabeceras se bloquea durante la edición.
-- **Contador del listado**: la barra bajo la botonera muestra cuántas filas con datos hay en la tabla ("Mostrando X de Y", siempre iguales al no haber filtro). Sin búsqueda ni filtro local: la búsqueda se hace desde el formulario principal (specs/004).
+- **Búsqueda del listado**: la barra `filterPanel` filtra en vivo las filas de la tabla con `ContactService.MatchesFilter` (coincidencia parcial, sin mayúsculas ni tildes, en las columnas visibles; la fecha vacía no se busca); las filas solo se **ocultan** — Guardar conserva también las ocultas — y el contador muestra cuántas se ven de cuántas hay. Si el futuro cliente actual queda oculto, la marca se retira; la caja queda bloqueada durante la edición.
 - **Conversión en cliente** (`convertButton`, sección 7): sobre el futuro cliente actual, con validación completa y doble confirmación; la baja de Futuros clientes y el alta en Clientes se hacen al pulsar Guardar.
 - **Guardar**:
   1. Confirma la celda en edición (`EndEdit`).

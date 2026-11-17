@@ -109,6 +109,32 @@ internal static class UiTestEnvironment
     public static List<Reminder> ReadReminders() => Store.LoadReminders();
 
     /// <summary>
+    /// Siembra el escenario de presupuestos escribiendo directamente en la
+    /// base de datos (specs/009 y specs/006). Reemplaza la tabla Quotes por
+    /// completo; el resto de tablas queda intacto.
+    /// </summary>
+    public static void WriteQuotes(params Quote[] quotes)
+    {
+        Directory.CreateDirectory(DataDirectory);
+        Store.SaveQuotes(quotes.ToList());
+    }
+
+    public static List<Quote> ReadQuotes() => Store.LoadQuotes();
+
+    /// <summary>
+    /// Siembra el escenario de pedidos y abonos escribiendo directamente en
+    /// la base de datos (specs/009 y specs/006). Reemplaza la tabla Orders
+    /// por completo; el resto de tablas queda intacto.
+    /// </summary>
+    public static void WriteOrders(params Order[] orders)
+    {
+        Directory.CreateDirectory(DataDirectory);
+        Store.SaveOrders(orders.ToList());
+    }
+
+    public static List<Order> ReadOrders() => Store.LoadOrders();
+
+    /// <summary>
     /// Fuerza un sello temporal distinto en la base de datos para simular que
     /// otro módulo la ha escrito mientras el formulario estaba abierto (la
     /// detección de cambios externos compara sellos temporales). Si la base
@@ -164,7 +190,8 @@ internal static class FormAccess
 
     /// <summary>
     /// Invoca el manejador de un botón (clic simulado) y relanza la excepción
-    /// real si el formulario falla, para que la prueba señale la causa.
+    /// real si el formulario falla, conservando la pila original, para que la
+    /// prueba señale la causa y su línea.
     /// </summary>
     public static void Click(object form, string handlerName)
     {
@@ -176,7 +203,8 @@ internal static class FormAccess
         }
         catch (TargetInvocationException ex)
         {
-            throw ex.InnerException!;
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException!).Throw();
+            throw;
         }
     }
 }
@@ -293,5 +321,36 @@ internal static class Fixtures
         Status = ReminderStatus.Active,
         RelatedId = relatedId,
         RelatedType = relatedType
+    };
+
+    /// <summary>Presupuesto vinculado al registro indicado (specs/009).</summary>
+    public static Quote Quote(Guid relatedId, TaskRelatedType relatedType = TaskRelatedType.Client,
+        DateTime? date = null, decimal amount = 1200.56m, string reference = "P-2026-001",
+        string description = "Mobiliario de oficina", QuoteStatus status = QuoteStatus.Pending,
+        Guid? orderId = null) => new()
+    {
+        Id = Guid.NewGuid(),
+        QuoteDate = date ?? new DateTime(2026, 11, 10),
+        Amount = amount,
+        Reference = reference,
+        Description = description,
+        Status = status,
+        RelatedId = relatedId,
+        RelatedType = relatedType,
+        OrderId = orderId
+    };
+
+    /// <summary>Pedido o abono de un cliente (specs/009).</summary>
+    public static Order Order(Guid clientId, OrderKind kind = OrderKind.Order,
+        DateTime? date = null, decimal amount = 1200.56m, string reference = "E-2026-001",
+        string description = "Mobiliario de oficina") => new()
+    {
+        Id = Guid.NewGuid(),
+        Kind = kind,
+        OrderDate = date ?? new DateTime(2026, 11, 12),
+        Amount = amount,
+        Reference = reference,
+        Description = description,
+        ClientId = clientId
     };
 }

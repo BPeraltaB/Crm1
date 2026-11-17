@@ -221,4 +221,42 @@ public sealed class ClientServiceTests : IDisposable
     {
         Assert.Equal("+34612345678", ClientService.NormalizePhone(" +34 612-345-678 "));
     }
+
+    // Pruebas de la búsqueda del listado (specs/002, caja «Buscar:»).
+
+    [Fact]
+    public void Filter_with_empty_text_returns_everything()
+    {
+        Assert.True(ClientService.MatchesFilter(ValidClient(), "   "));
+    }
+
+    [Fact]
+    public void Filter_matches_partial_name_ignoring_case()
+    {
+        Client client = ValidClient();
+        Assert.True(ClientService.MatchesFilter(client, "gar"));
+        Assert.True(ClientService.MatchesFilter(client, "JUAN"));
+    }
+
+    [Fact]
+    public void Filter_matches_without_tildes()
+    {
+        Client client = ValidClient(c => c.City = "València");
+        Assert.True(ClientService.MatchesFilter(client, "valencia"));
+    }
+
+    [Fact]
+    public void Filter_matches_document_phone_and_date()
+    {
+        Client client = ValidClient();
+        Assert.True(ClientService.MatchesFilter(client, "12345678"));
+        Assert.True(ClientService.MatchesFilter(client, "61234"));
+        Assert.True(ClientService.MatchesFilter(client, "15/01/2026"));
+    }
+
+    [Fact]
+    public void Filter_rejects_when_no_field_contains_the_text()
+    {
+        Assert.False(ClientService.MatchesFilter(ValidClient(), "zgz"));
+    }
 }

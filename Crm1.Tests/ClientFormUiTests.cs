@@ -439,4 +439,125 @@ public sealed class ClientFormUiTests
             Assert.Equal("Ana García Pérez", requestedName);
         });
     }
+
+    // Pruebas de la caja de búsqueda del listado (specs/002 §4).
+
+    [Fact]
+    public void Search_box_filters_rows_and_updates_the_counter()
+    {
+        UiTestEnvironment.WriteClients(
+            Fixtures.Client("Ana", "12345678Z"),
+            Fixtures.Client("Luis", "23456781R"),
+            Fixtures.Client("Zulema", "34567812P"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ClientForm();
+            form.Prompt = new PromptRecorder().Answer;
+            DataGridView grid = FormAccess.Grid(form, "clientsDataGridView");
+            TextBox searchBox = FormAccess.TextBox(form, "searchTextBox");
+
+            searchBox.Text = "ana";
+
+            Assert.Single(grid.Rows.Cast<DataGridViewRow>(), row => row.Visible);
+            Assert.True(grid.Rows[0].Visible);
+            Assert.Equal("Mostrando 1 de 3", FormAccess.Label(form, "counterLabel").Text);
+        });
+    }
+
+    [Fact]
+    public void Search_box_cleared_shows_every_client()
+    {
+        UiTestEnvironment.WriteClients(
+            Fixtures.Client("Ana", "12345678Z"),
+            Fixtures.Client("Luis", "23456781R"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ClientForm();
+            form.Prompt = new PromptRecorder().Answer;
+            DataGridView grid = FormAccess.Grid(form, "clientsDataGridView");
+            TextBox searchBox = FormAccess.TextBox(form, "searchTextBox");
+
+            searchBox.Text = "ana";
+            searchBox.Text = string.Empty;
+
+            Assert.Equal(2, grid.Rows.Cast<DataGridViewRow>().Count(row => row.Visible));
+            Assert.Equal("Mostrando 2 de 2", FormAccess.Label(form, "counterLabel").Text);
+        });
+    }
+
+    [Fact]
+    public void Hidden_current_client_loses_the_mark()
+    {
+        UiTestEnvironment.WriteClients(
+            Fixtures.Client("Ana", "12345678Z"),
+            Fixtures.Client("Luis", "23456781R"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ClientForm();
+            form.Prompt = new PromptRecorder().Answer;
+            DataGridView grid = FormAccess.Grid(form, "clientsDataGridView");
+            TextBox searchBox = FormAccess.TextBox(form, "searchTextBox");
+
+            grid.CurrentCell = grid.Rows[0].Cells["firstNameColumn"];
+            Assert.NotNull(form.CurrentClientId);
+
+            // El filtro oculta a Ana: la marca se retira (regla 5).
+            searchBox.Text = "luis";
+            Assert.Null(form.CurrentClientId);
+
+            // Al volver a verla, no hay marca hasta un nuevo clic.
+            searchBox.Text = string.Empty;
+            Assert.Null(form.CurrentClientId);
+        });
+    }
+
+    [Fact]
+    public void Search_box_is_blocked_while_editing()
+    {
+        UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ClientForm();
+            form.Prompt = new PromptRecorder().Answer;
+            TextBox searchBox = FormAccess.TextBox(form, "searchTextBox");
+            Assert.True(searchBox.Enabled);
+
+            FormAccess.Click(form, "NewButton_Click");
+            Assert.False(searchBox.Enabled);
+
+            FormAccess.Click(form, "CancelButton_Click");
+            Assert.True(searchBox.Enabled);
+        });
+    }
+
+    [Fact]
+    public void Saving_with_filter_keeps_hidden_clients()
+    {
+        Client ana = Fixtures.Client("Ana", "12345678Z");
+        Client luis = Fixtures.Client("Luis", "23456781R");
+        UiTestEnvironment.WriteClients(ana, luis);
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ClientForm();
+            form.Prompt = new PromptRecorder(DialogResult.OK).Answer;
+            DataGridView grid = FormAccess.Grid(form, "clientsDataGridView");
+            TextBox searchBox = FormAccess.TextBox(form, "searchTextBox");
+
+            searchBox.Text = "luis";
+            grid.CurrentCell = grid.Rows[1].Cells["firstNameColumn"];
+            FormAccess.Click(form, "ModifyButton_Click");
+            grid.Rows[1].Cells["notesColumn"].Value = "Nota con filtro";
+            FormAccess.Click(form, "SaveButton_Click");
+
+            // Las filas ocultas por la búsqueda se conservan al guardar.
+            List<Client> saved = UiTestEnvironment.ReadClients();
+            Assert.Equal(2, saved.Count);
+            Assert.Contains(saved, client => client.Notes == "Nota con filtro");
+        });
+    }
 }

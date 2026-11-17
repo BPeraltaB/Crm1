@@ -436,4 +436,47 @@ public sealed class ContactFormUiTests
             Assert.Equal("Elena", requestedName);
         });
     }
+
+    // Pruebas de la caja de búsqueda del listado (specs/003 §6).
+
+    [Fact]
+    public void Search_box_filters_rows_and_updates_the_counter()
+    {
+        UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
+        UiTestEnvironment.WriteContacts(Fixtures.Contact("Elena"), Fixtures.Contact("Iker"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ContactForm();
+            form.Prompt = new PromptRecorder().Answer;
+            DataGridView grid = FormAccess.Grid(form, "contactsDataGridView");
+            TextBox searchBox = FormAccess.TextBox(form, "searchTextBox");
+
+            searchBox.Text = "elena";
+
+            Assert.Single(grid.Rows.Cast<DataGridViewRow>(), row => row.Visible);
+            Assert.Equal("Mostrando 1 de 2", FormAccess.Label(form, "counterLabel").Text);
+        });
+    }
+
+    [Fact]
+    public void Saving_with_filter_keeps_hidden_contacts()
+    {
+        UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
+        UiTestEnvironment.WriteContacts(Fixtures.Contact("Elena"), Fixtures.Contact("Iker"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ContactForm();
+            form.Prompt = new PromptRecorder(DialogResult.OK).Answer;
+            DataGridView grid = FormAccess.Grid(form, "contactsDataGridView");
+            TextBox searchBox = FormAccess.TextBox(form, "searchTextBox");
+
+            searchBox.Text = "iker";
+            FormAccess.Click(form, "SaveButton_Click");
+
+            // Las filas ocultas por la búsqueda se conservan al guardar.
+            Assert.Equal(2, UiTestEnvironment.ReadContacts().Count);
+        });
+    }
 }
