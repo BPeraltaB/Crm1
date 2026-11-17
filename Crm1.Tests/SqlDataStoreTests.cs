@@ -375,4 +375,119 @@ public sealed class SqlDataStoreTests : IDisposable
         Assert.Equal(TaskRelatedType.Prospect, untouched.RelatedType);
         Assert.Equal(otherProspectId, untouched.RelatedId);
     }
+
+    // Pruebas de las tablas Quotes y Orders (specs/009 y specs/006).
+
+    private static Quote SampleQuote(TaskRelatedType relatedType = TaskRelatedType.Client,
+        QuoteStatus status = QuoteStatus.Accepted, Guid? orderId = null) => new()
+    {
+        Id = Guid.Parse("22222222-3333-4444-5555-666666666666"),
+        QuoteDate = new DateTime(2026, 11, 10),
+        Amount = 1234.56m,
+        Reference = "P-2026-0142",
+        Description = "Mobiliario de oficina",
+        Status = status,
+        RelatedId = Guid.Parse("01234567-89ab-cdef-0123-456789abcdef"),
+        RelatedType = relatedType,
+        OrderId = orderId
+    };
+
+    [Fact]
+    public void Quotes_roundtrip_preserves_all_fields()
+    {
+        SqlDataStore store = new(DatabasePath, LegacyStore);
+        Guid orderId = Guid.NewGuid();
+        Quote quote = SampleQuote(TaskRelatedType.Prospect, QuoteStatus.Dismissed, orderId);
+        store.SaveQuotes(new List<Quote> { quote });
+
+        Quote loaded = new SqlDataStore(DatabasePath, LegacyStore).LoadQuotes().Single();
+
+        Assert.Equal(quote.Id, loaded.Id);
+        Assert.Equal(new DateTime(2026, 11, 10), loaded.QuoteDate);
+        Assert.Equal(1234.56m, loaded.Amount);
+        Assert.Equal("P-2026-0142", loaded.Reference);
+        Assert.Equal("Mobiliario de oficina", loaded.Description);
+        Assert.Equal(QuoteStatus.Dismissed, loaded.Status);
+        Assert.Equal(TaskRelatedType.Prospect, loaded.RelatedType);
+        Assert.Equal(orderId, loaded.OrderId);
+    }
+
+    [Fact]
+    public void Quote_without_order_roundtrips_a_null_order_id()
+    {
+        SqlDataStore store = new(DatabasePath, LegacyStore);
+        store.SaveQuotes(new List<Quote> { SampleQuote() });
+
+        Assert.Null(store.LoadQuotes().Single().OrderId);
+    }
+
+    [Fact]
+    public void Saving_quotes_does_not_touch_other_tables()
+    {
+        SqlDataStore store = new(DatabasePath, LegacyStore);
+        store.SaveClients(new List<Client> { SampleClient() });
+        store.SaveTasks(new List<Task> { SampleTask() });
+        store.SaveOrders(new List<Order> { SampleOrder() });
+
+        store.SaveQuotes(new List<Quote> { SampleQuote() });
+
+        Assert.Single(store.LoadQuotes());
+        Assert.Single(store.LoadClients());
+        Assert.Single(store.LoadTasks());
+        Assert.Single(store.LoadOrders());
+    }
+
+    private static Order SampleOrder(OrderKind kind = OrderKind.CreditNote) => new()
+    {
+        Id = Guid.Parse("33333333-4444-5555-6666-777777777777"),
+        Kind = kind,
+        OrderDate = new DateTime(2026, 11, 12),
+        Amount = 9876.54m,
+        Reference = "E-2026-0099",
+        Description = "Sillas ergonómicas",
+        ClientId = Guid.Parse("01234567-89ab-cdef-0123-456789abcdef")
+    };
+
+    [Fact]
+    public void Orders_roundtrip_preserves_all_fields()
+    {
+        SqlDataStore store = new(DatabasePath, LegacyStore);
+        Order creditNote = SampleOrder(OrderKind.CreditNote);
+        creditNote.Id = Guid.Parse("44444444-5555-6666-7777-888888888888");
+        store.SaveOrders(new List<Order> { SampleOrder(OrderKind.Order), creditNote });
+
+        List<Order> loaded = new SqlDataStore(DatabasePath, LegacyStore).LoadOrders();
+
+        Assert.Equal(2, loaded.Count);
+        Order order = loaded[0];
+        Assert.Equal(SampleOrder().Id, order.Id);
+        Assert.Equal(OrderKind.Order, order.Kind);
+        Assert.Equal(new DateTime(2026, 11, 12), order.OrderDate);
+        Assert.Equal(9876.54m, order.Amount);
+        Assert.Equal("E-2026-0099", order.Reference);
+        Assert.Equal("Sillas ergonómicas", order.Description);
+        Assert.Equal(SampleOrder().ClientId, order.ClientId);
+        Assert.Equal(OrderKind.CreditNote, loaded[1].Kind);
+    }
+
+    [Fact]
+    public void Relink_moves_quotes_of_the_converted_prospect()
+    {
+        SqlDataStore store = new(DatabasePath, LegacyStore);
+        Guid prospectId = Guid.NewGuid();
+        Guid clientId = Guid.NewGuid();
+        Quote prospectQuote = SampleQuote(TaskRelatedType.Prospect, QuoteStatus.Pending);
+        prospectQuote.RelatedId = prospectId;
+        Quote clientQuote = SampleQuote();
+        clientQuote.Id = Guid.Parse("55555555-6666-7777-8888-999999999999");
+        store.SaveQuotes(new List<Quote> { prospectQuote, clientQuote });
+
+        int moved = store.RelinkRelatedRecords(prospectId, clientId);
+
+        Assert.Equal(1, moved);
+        List<Quote> quotes = store.LoadQuotes();
+        Assert.Equal(clientId, quotes.Single(quote => quote.Id == prospectQuote.Id).RelatedId);
+        Assert.Equal(TaskRelatedType.Client, quotes.Single(quote => quote.Id == prospectQuote.Id).RelatedType);
+        Assert.Equal(SampleQuote().RelatedId, quotes.Single(quote => quote.Id == clientQuote.Id).RelatedId);
+    }
 }

@@ -169,6 +169,28 @@ public sealed class SqlDataStore : IDataStore
                         RelatedType TEXT NOT NULL
                     );
 
+                    CREATE TABLE IF NOT EXISTS Quotes (
+                        Id TEXT PRIMARY KEY,
+                        QuoteDate TEXT NOT NULL,
+                        Amount TEXT NOT NULL,
+                        Reference TEXT NOT NULL,
+                        Description TEXT NOT NULL,
+                        Status TEXT NOT NULL,
+                        RelatedId TEXT NOT NULL,
+                        RelatedType TEXT NOT NULL,
+                        OrderId TEXT NOT NULL
+                    );
+
+                    CREATE TABLE IF NOT EXISTS Orders (
+                        Id TEXT PRIMARY KEY,
+                        Kind TEXT NOT NULL,
+                        OrderDate TEXT NOT NULL,
+                        Amount TEXT NOT NULL,
+                        Reference TEXT NOT NULL,
+                        Description TEXT NOT NULL,
+                        ClientId TEXT NOT NULL
+                    );
+
                     CREATE TABLE IF NOT EXISTS SchemaInfo (
                         Key TEXT PRIMARY KEY,
                         Value TEXT NOT NULL
@@ -344,6 +366,13 @@ public sealed class SqlDataStore : IDataStore
                 ("@clientType", nameof(TaskRelatedType.Client)),
                 ("@prospectId", prospectId.ToString()),
                 ("@prospectType", nameof(TaskRelatedType.Prospect)));
+            count += ExecuteNonQuery(connection, transaction,
+                "UPDATE Quotes SET RelatedId = @clientId, RelatedType = @clientType " +
+                "WHERE RelatedId = @prospectId AND RelatedType = @prospectType",
+                ("@clientId", clientId.ToString()),
+                ("@clientType", nameof(TaskRelatedType.Client)),
+                ("@prospectId", prospectId.ToString()),
+                ("@prospectType", nameof(TaskRelatedType.Prospect)));
             transaction.Commit();
             return count;
         }
@@ -353,6 +382,162 @@ public sealed class SqlDataStore : IDataStore
             throw;
         }
     });
+
+    /// <summary>
+    /// Carga los presupuestos guardados (specs/009). Una base sin ellos
+    /// devuelve una lista vacía; una base ilegible lanza una excepción
+    /// visible (constitución, punto 5).
+    /// </summary>
+    public List<Quote> LoadQuotes() => Execute(connection =>
+    {
+        EnsureSchemaAndMigrate(connection);
+        var quotes = new List<Quote>();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id, QuoteDate, Amount, Reference, Description, Status, RelatedId, RelatedType, OrderId FROM Quotes";
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            quotes.Add(MapQuote(reader));
+        }
+        return quotes;
+    });
+
+    /// <summary>
+    /// Guarda los presupuestos reemplazando el contenido de la tabla Quotes
+    /// en una transacción (specs/009). La tabla es independiente de las
+    /// demás; los precios viajan como texto en cultura invariable, exactos
+    /// para decimal.
+    /// </summary>
+    public void SaveQuotes(List<Quote> quotes) => Execute<object?>(connection =>
+    {
+        EnsureSchemaAndMigrate(connection);
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        try
+        {
+            ExecuteNonQuery(connection, transaction, "DELETE FROM Quotes");
+            foreach (Quote quote in quotes)
+            {
+                InsertQuoteRow(connection, transaction, quote);
+            }
+            transaction.Commit();
+            return null;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    });
+
+    /// <summary>
+    /// Carga los pedidos y abonos guardados (specs/009). Una base sin ellos
+    /// devuelve una lista vacía; una base ilegible lanza una excepción
+    /// visible (constitución, punto 5).
+    /// </summary>
+    public List<Order> LoadOrders() => Execute(connection =>
+    {
+        EnsureSchemaAndMigrate(connection);
+        var orders = new List<Order>();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id, Kind, OrderDate, Amount, Reference, Description, ClientId FROM Orders";
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            orders.Add(MapOrder(reader));
+        }
+        return orders;
+    });
+
+    /// <summary>
+    /// Guarda los pedidos y abonos reemplazando el contenido de la tabla
+    /// Orders en una transacción (specs/009), independiente de las demás.
+    /// </summary>
+    public void SaveOrders(List<Order> orders) => Execute<object?>(connection =>
+    {
+        EnsureSchemaAndMigrate(connection);
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        try
+        {
+            ExecuteNonQuery(connection, transaction, "DELETE FROM Orders");
+            foreach (Order order in orders)
+            {
+                InsertOrderRow(connection, transaction, order);
+            }
+            transaction.Commit();
+            return null;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    });
+
+    // Convierte una fila de la tabla Quotes (specs/009): fechas ISO, enums
+    // como nombre del valor, precio en cultura invariable y OrderId vacío
+    // cuando el presupuesto aún no tiene pedido.
+    private static Quote MapQuote(SqliteDataReader reader) => new()
+    {
+        Id = Guid.Parse(Text(reader, 0)),
+        QuoteDate = ParseDate(Text(reader, 1)),
+        Amount = decimal.Parse(Text(reader, 2), System.Globalization.CultureInfo.InvariantCulture),
+        Reference = Text(reader, 3),
+        Description = Text(reader, 4),
+        Status = Enum.Parse<QuoteStatus>(Text(reader, 5)),
+        RelatedId = Guid.Parse(Text(reader, 6)),
+        RelatedType = Enum.Parse<TaskRelatedType>(Text(reader, 7)),
+        OrderId = string.IsNullOrWhiteSpace(Text(reader, 8)) ? null : Guid.Parse(Text(reader, 8))
+    };
+
+    // Convierte una fila de la tabla Orders (specs/009).
+    private static Order MapOrder(SqliteDataReader reader) => new()
+    {
+        Id = Guid.Parse(Text(reader, 0)),
+        Kind = Enum.Parse<OrderKind>(Text(reader, 1)),
+        OrderDate = ParseDate(Text(reader, 2)),
+        Amount = decimal.Parse(Text(reader, 3), System.Globalization.CultureInfo.InvariantCulture),
+        Reference = Text(reader, 4),
+        Description = Text(reader, 5),
+        ClientId = Guid.Parse(Text(reader, 6))
+    };
+
+    // Inserta una fila parametrizada en la tabla Quotes.
+    private static void InsertQuoteRow(SqliteConnection connection, SqliteTransaction transaction, Quote quote)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            "INSERT INTO Quotes (Id, QuoteDate, Amount, Reference, Description, Status, RelatedId, RelatedType, OrderId) " +
+            "VALUES (@id, @quoteDate, @amount, @reference, @description, @status, @relatedId, @relatedType, @orderId)";
+        command.Parameters.AddWithValue("@id", quote.Id.ToString());
+        command.Parameters.AddWithValue("@quoteDate", FormatDate(quote.QuoteDate));
+        command.Parameters.AddWithValue("@amount", quote.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("@reference", quote.Reference ?? string.Empty);
+        command.Parameters.AddWithValue("@description", quote.Description ?? string.Empty);
+        command.Parameters.AddWithValue("@status", quote.Status.ToString());
+        command.Parameters.AddWithValue("@relatedId", quote.RelatedId.ToString());
+        command.Parameters.AddWithValue("@relatedType", quote.RelatedType.ToString());
+        command.Parameters.AddWithValue("@orderId", quote.OrderId?.ToString() ?? string.Empty);
+        command.ExecuteNonQuery();
+    }
+
+    // Inserta una fila parametrizada en la tabla Orders.
+    private static void InsertOrderRow(SqliteConnection connection, SqliteTransaction transaction, Order order)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            "INSERT INTO Orders (Id, Kind, OrderDate, Amount, Reference, Description, ClientId) " +
+            "VALUES (@id, @kind, @orderDate, @amount, @reference, @description, @clientId)";
+        command.Parameters.AddWithValue("@id", order.Id.ToString());
+        command.Parameters.AddWithValue("@kind", order.Kind.ToString());
+        command.Parameters.AddWithValue("@orderDate", FormatDate(order.OrderDate));
+        command.Parameters.AddWithValue("@amount", order.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("@reference", order.Reference ?? string.Empty);
+        command.Parameters.AddWithValue("@description", order.Description ?? string.Empty);
+        command.Parameters.AddWithValue("@clientId", order.ClientId.ToString());
+        command.ExecuteNonQuery();
+    }
 
     // Abre una conexión (creando antes la carpeta) y ejecuta la acción. Cualquier
     // fallo se convierte en un error visible (constitución, punto 5).
