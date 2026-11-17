@@ -12,6 +12,9 @@
 ## Proyectos
 - No hay proyectos registrados todavía.
 
+## Presupuestos y pedidos (datos de prueba)
+- 76 presupuestos (47 de clientes y 29 de futuros: 44 Pendientes, 24 Aceptados, 8 Descartados) y 37 movimientos (30 pedidos y 7 abonos) sembrados el 17/11 en `Data/crm1.db` con la herramienta regenerable %TEMP%\opencode\crm1-seed-presupuestos (solo reemplaza Quotes/Orders). Reglas verificadas: pedidos/abonos solo de clientes; Aceptados con pedido enlazados y coherentes (OrderId, misma fecha/precio/referencia/descripción); los 4 primeros futuros con presupuesto «Aceptado sin pedido» para el botón «Crear pedido»; netos 2025: 18.143,61 € (12 mov.) y 2026: 52.706,76 € (25 mov.).
+
 ## Ventas
 - No hay ventas registradas todavía.
 
