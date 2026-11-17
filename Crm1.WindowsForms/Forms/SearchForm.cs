@@ -76,12 +76,16 @@ public partial class SearchForm : System.Windows.Forms.Form
         List<Contact> contacts;
         List<Models.Task> tasks;
         List<Reminder> reminders;
+        List<Quote> quotes;
+        List<Order> orders;
         try
         {
             clients = _dataStore.LoadClients();
             contacts = _dataStore.LoadContacts();
             tasks = _dataStore.LoadTasks();
             reminders = _dataStore.LoadReminders();
+            quotes = _dataStore.LoadQuotes();
+            orders = _dataStore.LoadOrders();
         }
         catch (Exception ex)
         {
@@ -93,9 +97,10 @@ public partial class SearchForm : System.Windows.Forms.Form
             return;
         }
 
-        foreach (SearchMatch match in SearchService.Search(clients, contacts, tasks, reminders, term))
+        foreach (SearchMatch match in SearchService.Search(clients, contacts, tasks, reminders, quotes, orders, term))
         {
-            if (match.Module is SearchModule.Task or SearchModule.Reminder)
+            if (match.Module is SearchModule.Task or SearchModule.Reminder
+                or SearchModule.Quote or SearchModule.Order)
             {
                 AddTaskResultRow(match);
             }
@@ -163,8 +168,9 @@ public partial class SearchForm : System.Windows.Forms.Form
     }
 
     /// <summary>
-    /// Añade un resultado de tarea o recordatorio a la tabla inferior: tipo,
-    /// título o asunto, registro vinculado con su prefijo, fecha y estado.
+    /// Añade un resultado de tarea, recordatorio, presupuesto o pedido a la
+    /// tabla inferior: tipo, título o asunto, registro vinculado con su
+    /// prefijo, fecha y estado.
     /// </summary>
     private void AddTaskResultRow(SearchMatch match)
     {
@@ -183,6 +189,31 @@ public partial class SearchForm : System.Windows.Forms.Form
                     Models.TaskStatus.InProgress => "En curso",
                     _ => "Pendiente"
                 });
+        }
+        else if (match.Module == SearchModule.Quote)
+        {
+            Quote quote = match.Quote!;
+            index = tasksDataGridView.Rows.Add(
+                "Presupuesto",
+                match.DisplayName,
+                match.RelatedName,
+                quote.QuoteDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+                quote.Status switch
+                {
+                    QuoteStatus.Accepted => "Aceptado",
+                    QuoteStatus.Dismissed => "Descartado",
+                    _ => "Pendiente"
+                });
+        }
+        else if (match.Module == SearchModule.Order)
+        {
+            Order order = match.Order!;
+            index = tasksDataGridView.Rows.Add(
+                order.Kind == OrderKind.CreditNote ? "Abono" : "Pedido",
+                match.DisplayName,
+                match.RelatedName,
+                order.OrderDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+                string.Empty);
         }
         else
         {

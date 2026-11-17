@@ -21,7 +21,13 @@ public enum SearchModule
     Task,
 
     /// <summary>Recordatorio (tabla de ReminderForm, specs/007).</summary>
-    Reminder
+    Reminder,
+
+    /// <summary>Presupuesto (tabla de QuoteForm, specs/009).</summary>
+    Quote,
+
+    /// <summary>Pedido o abono (tabla de OrderForm, specs/009).</summary>
+    Order
 }
 
 /// <summary>
@@ -54,6 +60,12 @@ public sealed class SearchMatch
     /// <summary>Registro completo encontrado cuando es un recordatorio.</summary>
     public Reminder? Reminder { get; init; }
 
+    /// <summary>Registro completo encontrado cuando es un presupuesto.</summary>
+    public Quote? Quote { get; init; }
+
+    /// <summary>Registro completo encontrado cuando es un pedido o abono.</summary>
+    public Order? Order { get; init; }
+
     /// <summary>
     /// Registro vinculado con el prefijo del módulo («(Cliente) Ana»), para
     /// tareas y recordatorios; «—» si el vínculo está roto.
@@ -78,15 +90,29 @@ public static class SearchService
         => Search(clients, contacts, Array.Empty<Task>(), Array.Empty<Reminder>(), term);
 
     /// <summary>
-    /// Búsqueda global completa (specs/004): clientes, futuros clientes,
-    /// tareas (specs/005) y recordatorios (specs/007), con las mismas reglas
-    /// de coincidencia para todos.
+    /// Búsqueda global con tareas y recordatorios (specs/004, specs/005 y
+    /// specs/007).
     /// </summary>
     public static IReadOnlyList<SearchMatch> Search(
         IEnumerable<Client> clients,
         IEnumerable<Contact> contacts,
         IEnumerable<Task> tasks,
         IEnumerable<Reminder> reminders,
+        string? term)
+        => Search(clients, contacts, tasks, reminders, Array.Empty<Quote>(), Array.Empty<Order>(), term);
+
+    /// <summary>
+    /// Búsqueda global completa (specs/004): clientes, futuros clientes,
+    /// tareas (specs/005), recordatorios (specs/007) y presupuestos y
+    /// pedidos (specs/009), con las mismas reglas de coincidencia para todos.
+    /// </summary>
+    public static IReadOnlyList<SearchMatch> Search(
+        IEnumerable<Client> clients,
+        IEnumerable<Contact> contacts,
+        IEnumerable<Task> tasks,
+        IEnumerable<Reminder> reminders,
+        IEnumerable<Quote> quotes,
+        IEnumerable<Order> orders,
         string? term)
     {
         var matches = new List<SearchMatch>();
@@ -99,7 +125,7 @@ public static class SearchService
         foreach (Client client in clients)
         {
             AddMatch(matches, SearchModule.Client, client.Id,
-                client, null, null, null,
+                client, null, null, null, null, null,
                 BuildDisplayName(client.FirstName, client.LastName1, client.LastName2),
                 ClientFields(client), normalizedTerm);
         }
@@ -107,7 +133,7 @@ public static class SearchService
         foreach (Contact contact in contacts)
         {
             AddMatch(matches, SearchModule.Contact, contact.Id,
-                null, contact, null, null,
+                null, contact, null, null, null, null,
                 BuildDisplayName(contact.FirstName, contact.LastName1, contact.LastName2),
                 ContactFields(contact), normalizedTerm);
         }
@@ -118,7 +144,7 @@ public static class SearchService
         foreach (Task task in tasks)
         {
             AddMatch(matches, SearchModule.Task, task.Id,
-                null, null, task, null,
+                null, null, task, null, null, null,
                 task.Action,
                 TaskFields(task, relatedNames.GetValueOrDefault(task.RelatedId, "—")),
                 normalizedTerm);
@@ -127,9 +153,27 @@ public static class SearchService
         foreach (Reminder reminder in reminders)
         {
             AddMatch(matches, SearchModule.Reminder, reminder.Id,
-                null, null, null, reminder,
+                null, null, null, reminder, null, null,
                 reminder.Subject,
                 ReminderFields(reminder, relatedNames.GetValueOrDefault(reminder.RelatedId, "—")),
+                normalizedTerm);
+        }
+
+        foreach (Quote quote in quotes)
+        {
+            AddMatch(matches, SearchModule.Quote, quote.Id,
+                null, null, null, null, quote, null,
+                QuoteDisplayName(quote),
+                QuoteFields(quote, relatedNames.GetValueOrDefault(quote.RelatedId, "—")),
+                normalizedTerm);
+        }
+
+        foreach (Order order in orders)
+        {
+            AddMatch(matches, SearchModule.Order, order.Id,
+                null, null, null, null, null, order,
+                OrderDisplayName(order),
+                OrderFields(order, relatedNames.GetValueOrDefault(order.ClientId, "—")),
                 normalizedTerm);
         }
 
@@ -164,6 +208,8 @@ public static class SearchService
         Contact? contact,
         Task? task,
         Reminder? reminder,
+        Quote? quote,
+        Order? order,
         string displayName,
         (string Label, string Value)[] fields,
         string normalizedTerm)
@@ -192,8 +238,10 @@ public static class SearchService
                 Contact = contact,
                 Task = task,
                 Reminder = reminder,
-                RelatedName = module is SearchModule.Task or SearchModule.Reminder
-                    ? fields.FirstOrDefault(field => field.Label == "Cliente/Futuro cliente").Value
+                Quote = quote,
+                Order = order,
+                RelatedName = module is SearchModule.Task or SearchModule.Reminder or SearchModule.Quote or SearchModule.Order
+                    ? fields.FirstOrDefault(field => field.Label == "Cliente/Futuro cliente" || field.Label == "Cliente").Value
                     : string.Empty
             });
         }
@@ -270,6 +318,47 @@ public static class SearchService
         TaskStatus.InProgress => "En curso",
         _ => "Pendiente"
     };
+
+    // Campos visibles de un presupuesto (specs/009), con sus etiquetas; el
+    // vínculo se busca por su nombre resuelto y el precio en formato español.
+    private static (string Label, string Value)[] QuoteFields(Quote quote, string relatedName) => new[]
+    {
+        ("Fecha", quote.QuoteDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)),
+        ("Precio", SpanishPrice.Format(quote.Amount)),
+        ("Referencia", quote.Reference),
+        ("Descripción", quote.Description),
+        ("Estado", quote.Status switch
+        {
+            QuoteStatus.Accepted => "Aceptado",
+            QuoteStatus.Dismissed => "Descartado",
+            _ => "Pendiente"
+        }),
+        ("Cliente/Futuro cliente", relatedName)
+    };
+
+    // Campos visibles de un pedido o abono (specs/009).
+    private static (string Label, string Value)[] OrderFields(Order order, string relatedName) => new[]
+    {
+        ("Tipo", order.Kind == OrderKind.CreditNote ? "Abono" : "Pedido"),
+        ("Fecha", order.OrderDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)),
+        ("Precio", SpanishPrice.Format(order.Amount)),
+        ("Referencia", order.Reference),
+        ("Descripción", order.Description),
+        ("Cliente", relatedName)
+    };
+
+    // Nombre para mostrar de un presupuesto: descripción, referencia o una
+    // identificación neutra (lo pide la tabla inferior de la búsqueda).
+    private static string QuoteDisplayName(Quote quote) =>
+        quote.Description.Length > 0 ? quote.Description
+        : quote.Reference.Length > 0 ? quote.Reference
+        : "Presupuesto";
+
+    // Nombre para mostrar de un pedido o abono.
+    private static string OrderDisplayName(Order order) =>
+        order.Description.Length > 0 ? order.Description
+        : order.Reference.Length > 0 ? order.Reference
+        : order.Kind == OrderKind.CreditNote ? "Abono" : "Pedido";
 
     // Nombre para mostrar: nombre y apellidos no vacíos (razón social en empresas).
     private static string BuildDisplayName(string firstName, string lastName1, string lastName2) =>

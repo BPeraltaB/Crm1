@@ -39,7 +39,10 @@ partial class ContactForm
         cancelButton = new Button();
         convertButton = new Button();
         tasksButton = new Button();
+        quotesButton = new Button();
         filterPanel = new Panel();
+        searchLabel = new Label();
+        searchTextBox = new TextBox();
         counterLabel = new Label();
         contactsDataGridView = new DataGridView();
         firstNameColumn = new DataGridViewTextBoxColumn();
@@ -70,6 +73,7 @@ partial class ContactForm
         buttonPanel.Controls.Add(cancelButton);
         buttonPanel.Controls.Add(convertButton);
         buttonPanel.Controls.Add(tasksButton);
+        buttonPanel.Controls.Add(quotesButton);
         buttonPanel.Dock = DockStyle.Top;
         buttonPanel.Location = new Point(0, 0);
         buttonPanel.Name = "buttonPanel";
@@ -146,16 +150,43 @@ partial class ContactForm
         tasksButton.Text = "Tareas";
         tasksButton.UseVisualStyleBackColor = true;
         tasksButton.Click += TasksButton_Click;
-        // 
+        //
+        // quotesButton
+        //
+        quotesButton.Location = new Point(802, 12);
+        quotesButton.Name = "quotesButton";
+        quotesButton.Size = new Size(150, 35);
+        quotesButton.TabIndex = 7;
+        quotesButton.Text = "Presupuestos";
+        quotesButton.UseVisualStyleBackColor = true;
+        quotesButton.Click += QuotesButton_Click;
+        //
         // filterPanel
-        // 
+        //
         filterPanel.BackColor = Color.FromArgb(243, 244, 246);
+        filterPanel.Controls.Add(searchLabel);
+        filterPanel.Controls.Add(searchTextBox);
         filterPanel.Controls.Add(counterLabel);
         filterPanel.Dock = DockStyle.Top;
         filterPanel.Location = new Point(0, 60);
         filterPanel.Name = "filterPanel";
         filterPanel.Size = new Size(1200, 40);
         filterPanel.TabIndex = 6;
+        // 
+        // searchLabel
+        // 
+        searchLabel.Location = new Point(10, 9);
+        searchLabel.Name = "searchLabel";
+        searchLabel.Size = new Size(50, 20);
+        searchLabel.Text = "Buscar:";
+        // 
+        // searchTextBox
+        // 
+        searchTextBox.Location = new Point(65, 6);
+        searchTextBox.Name = "searchTextBox";
+        searchTextBox.Size = new Size(240, 23);
+        searchTextBox.TabIndex = 1;
+        searchTextBox.TextChanged += SearchTextBox_TextChanged;
         // 
         // counterLabel
         // 
@@ -305,7 +336,10 @@ partial class ContactForm
     private System.Windows.Forms.Button cancelButton;
     private System.Windows.Forms.Button convertButton;
     private System.Windows.Forms.Button tasksButton;
+    private System.Windows.Forms.Button quotesButton;
     private System.Windows.Forms.Panel filterPanel;
+    private System.Windows.Forms.Label searchLabel;
+    private System.Windows.Forms.TextBox searchTextBox;
     private System.Windows.Forms.Label counterLabel;
     private System.Windows.Forms.DataGridView contactsDataGridView;
     private System.Windows.Forms.DataGridViewTextBoxColumn firstNameColumn;

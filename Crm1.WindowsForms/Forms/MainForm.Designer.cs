@@ -39,6 +39,8 @@ partial class MainForm
         this.prospectsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.tasksMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.remindersMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+        this.quotesMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+        this.ordersMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.bottomSeparator = new System.Windows.Forms.ToolStripSeparator();
         this.exitMenuItem = new System.Windows.Forms.ToolStripMenuItem();
         this.panelContent = new System.Windows.Forms.Panel();
@@ -67,6 +69,8 @@ partial class MainForm
             this.prospectsMenuItem,
             this.tasksMenuItem,
             this.remindersMenuItem,
+            this.quotesMenuItem,
+            this.ordersMenuItem,
             this.bottomSeparator,
             this.exitMenuItem});
         this.menuStrip.LayoutStyle = System.Windows.Forms.ToolStripLayoutStyle.VerticalStackWithOverflow;
@@ -141,6 +145,28 @@ partial class MainForm
         this.remindersMenuItem.Text = "Recordatorios";
         this.remindersMenuItem.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
         this.remindersMenuItem.Click += new System.EventHandler(this.RemindersMenuItem_Click);
+        //
+        // quotesMenuItem
+        //
+        this.quotesMenuItem.AutoSize = false;
+        this.quotesMenuItem.ForeColor = System.Drawing.Color.FromArgb(226, 232, 240);
+        this.quotesMenuItem.Margin = new System.Windows.Forms.Padding(4, 1, 4, 1);
+        this.quotesMenuItem.Padding = new System.Windows.Forms.Padding(8, 0, 0, 0);
+        this.quotesMenuItem.Size = new System.Drawing.Size(212, 40);
+        this.quotesMenuItem.Text = "Presupuestos";
+        this.quotesMenuItem.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.quotesMenuItem.Click += new System.EventHandler(this.QuotesMenuItem_Click);
+        //
+        // ordersMenuItem
+        //
+        this.ordersMenuItem.AutoSize = false;
+        this.ordersMenuItem.ForeColor = System.Drawing.Color.FromArgb(226, 232, 240);
+        this.ordersMenuItem.Margin = new System.Windows.Forms.Padding(4, 1, 4, 1);
+        this.ordersMenuItem.Padding = new System.Windows.Forms.Padding(8, 0, 0, 0);
+        this.ordersMenuItem.Size = new System.Drawing.Size(212, 40);
+        this.ordersMenuItem.Text = "Pedidos";
+        this.ordersMenuItem.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        this.ordersMenuItem.Click += new System.EventHandler(this.OrdersMenuItem_Click);
         // 
         // bottomSeparator
         // 
@@ -226,6 +252,8 @@ partial class MainForm
     private System.Windows.Forms.ToolStripMenuItem prospectsMenuItem;
     private System.Windows.Forms.ToolStripMenuItem tasksMenuItem;
     private System.Windows.Forms.ToolStripMenuItem remindersMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem quotesMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem ordersMenuItem;
     private System.Windows.Forms.ToolStripSeparator bottomSeparator;
     private System.Windows.Forms.ToolStripMenuItem exitMenuItem;
     private System.Windows.Forms.Panel panelContent;

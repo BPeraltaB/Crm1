@@ -37,7 +37,11 @@ partial class ClientForm
         this.saveButton = new System.Windows.Forms.Button();
         this.cancelButton = new System.Windows.Forms.Button();
         this.tasksButton = new System.Windows.Forms.Button();
+        this.quotesButton = new System.Windows.Forms.Button();
+        this.ordersButton = new System.Windows.Forms.Button();
         this.filterPanel = new System.Windows.Forms.Panel();
+        this.searchLabel = new System.Windows.Forms.Label();
+        this.searchTextBox = new System.Windows.Forms.TextBox();
         this.counterLabel = new System.Windows.Forms.Label();
         this.clientsDataGridView = new System.Windows.Forms.DataGridView();
         this.firstNameColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
@@ -66,6 +70,8 @@ partial class ClientForm
         this.buttonPanel.Controls.Add(this.saveButton);
         this.buttonPanel.Controls.Add(this.cancelButton);
         this.buttonPanel.Controls.Add(this.tasksButton);
+        this.buttonPanel.Controls.Add(this.quotesButton);
+        this.buttonPanel.Controls.Add(this.ordersButton);
         this.buttonPanel.Dock = System.Windows.Forms.DockStyle.Top;
         this.buttonPanel.Location = new System.Drawing.Point(0, 0);
         this.buttonPanel.Name = "buttonPanel";
@@ -133,15 +139,52 @@ partial class ClientForm
         this.tasksButton.UseVisualStyleBackColor = true;
         this.tasksButton.Click += new System.EventHandler(this.TasksButton_Click);
         //
+        // quotesButton
+        //
+        this.quotesButton.Location = new System.Drawing.Point(795, 12);
+        this.quotesButton.Name = "quotesButton";
+        this.quotesButton.Size = new System.Drawing.Size(150, 35);
+        this.quotesButton.TabIndex = 6;
+        this.quotesButton.Text = "Presupuestos";
+        this.quotesButton.UseVisualStyleBackColor = true;
+        this.quotesButton.Click += new System.EventHandler(this.QuotesButton_Click);
+        //
+        // ordersButton
+        //
+        this.ordersButton.Location = new System.Drawing.Point(960, 12);
+        this.ordersButton.Name = "ordersButton";
+        this.ordersButton.Size = new System.Drawing.Size(120, 35);
+        this.ordersButton.TabIndex = 7;
+        this.ordersButton.Text = "Pedidos";
+        this.ordersButton.UseVisualStyleBackColor = true;
+        this.ordersButton.Click += new System.EventHandler(this.OrdersButton_Click);
+        //
         // filterPanel
         //
         this.filterPanel.BackColor = System.Drawing.Color.FromArgb(243, 244, 246);
+        this.filterPanel.Controls.Add(this.searchLabel);
+        this.filterPanel.Controls.Add(this.searchTextBox);
         this.filterPanel.Controls.Add(this.counterLabel);
         this.filterPanel.Dock = System.Windows.Forms.DockStyle.Top;
         this.filterPanel.Location = new System.Drawing.Point(0, 60);
         this.filterPanel.Name = "filterPanel";
         this.filterPanel.Size = new System.Drawing.Size(1200, 40);
         this.filterPanel.TabIndex = 5;
+        //
+        // searchLabel
+        //
+        this.searchLabel.Location = new System.Drawing.Point(10, 9);
+        this.searchLabel.Name = "searchLabel";
+        this.searchLabel.Size = new System.Drawing.Size(50, 20);
+        this.searchLabel.Text = "Buscar:";
+        //
+        // searchTextBox
+        //
+        this.searchTextBox.Location = new System.Drawing.Point(65, 6);
+        this.searchTextBox.Name = "searchTextBox";
+        this.searchTextBox.Size = new System.Drawing.Size(240, 23);
+        this.searchTextBox.TabIndex = 0;
+        this.searchTextBox.TextChanged += new System.EventHandler(this.SearchTextBox_TextChanged);
         //
         // counterLabel
         //
@@ -150,7 +193,7 @@ partial class ClientForm
         this.counterLabel.Name = "counterLabel";
         this.counterLabel.Size = new System.Drawing.Size(210, 20);
         this.counterLabel.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-        // El texto se rellena desde UpdateCounter.
+        // El texto se rellena desde ApplyFilter.
         //
         // clientsDataGridView
         //
@@ -286,7 +329,11 @@ partial class ClientForm
     private System.Windows.Forms.Button saveButton;
     private System.Windows.Forms.Button cancelButton;
     private System.Windows.Forms.Button tasksButton;
+    private System.Windows.Forms.Button quotesButton;
+    private System.Windows.Forms.Button ordersButton;
     private System.Windows.Forms.Panel filterPanel;
+    private System.Windows.Forms.Label searchLabel;
+    private System.Windows.Forms.TextBox searchTextBox;
     private System.Windows.Forms.Label counterLabel;
     private System.Windows.Forms.DataGridView clientsDataGridView;
     private System.Windows.Forms.DataGridViewTextBoxColumn firstNameColumn;

@@ -14,6 +14,8 @@ public partial class MainForm : System.Windows.Forms.Form
     private SearchForm? searchForm;
     private TaskForm? taskForm;
     private ReminderForm? reminderForm;
+    private QuoteForm? quoteForm;
+    private OrderForm? orderForm;
 
     public MainForm()
     {
@@ -32,13 +34,18 @@ public partial class MainForm : System.Windows.Forms.Form
     /// </summary>
     private void ClientsMenuItem_Click(object? sender, EventArgs e)
     {
-        // Crea el formulario de clientes una sola vez y atiende su botón
-        // Tareas: abre el módulo de tareas filtrado al cliente marcado.
+        // Crea el formulario de clientes una sola vez y atiende sus botones
+        // Tareas, Presupuestos y Pedidos: abren el módulo correspondiente
+        // filtrado al cliente marcado.
         if (clientForm is null)
         {
             clientForm = new ClientForm();
             clientForm.TasksRequested += (id, name) =>
                 ShowFilteredTasks(Crm1.WindowsForms.Models.TaskRelatedType.Client, id, name);
+            clientForm.QuotesRequested += (id, name) =>
+                ShowFilteredQuotes(Crm1.WindowsForms.Models.TaskRelatedType.Client, id, name);
+            clientForm.OrdersRequested += (id, name) =>
+                ShowFilteredOrders(id, name);
         }
 
         ShowModule(clientForm);
@@ -49,13 +56,16 @@ public partial class MainForm : System.Windows.Forms.Form
     /// </summary>
     private void ProspectsMenuItem_Click(object? sender, EventArgs e)
     {
-        // Crea el formulario una sola vez y atiende su botón Tareas: abre el
-        // módulo de tareas filtrado al futuro cliente marcado.
+        // Crea el formulario una sola vez y atiende sus botones Tareas y
+        // Presupuestos: abren el módulo correspondiente filtrado al futuro
+        // cliente marcado (Pedidos no: un futuro con pedido ya sería cliente).
         if (contactForm is null)
         {
             contactForm = new ContactForm();
             contactForm.TasksRequested += (id, name) =>
                 ShowFilteredTasks(Crm1.WindowsForms.Models.TaskRelatedType.Prospect, id, name);
+            contactForm.QuotesRequested += (id, name) =>
+                ShowFilteredQuotes(Crm1.WindowsForms.Models.TaskRelatedType.Prospect, id, name);
         }
 
         ShowModule(contactForm);
@@ -75,14 +85,36 @@ public partial class MainForm : System.Windows.Forms.Form
 
     /// <summary>
     /// Muestra el formulario de recordatorios embebido en el área central.
-    /// Por ahora el formulario está en blanco: los recordatorios pasados y
-    /// futuros se listarán cuando el módulo tenga su especificación.
     /// </summary>
     private void RemindersMenuItem_Click(object? sender, EventArgs e)
     {
         // Crea el formulario de recordatorios una sola vez.
         reminderForm ??= new ReminderForm();
         ShowModule(reminderForm);
+    }
+
+    /// <summary>
+    /// Muestra el formulario de presupuestos embebido en el área central.
+    /// Desde el menú siempre se ven todos (sin filtro).
+    /// </summary>
+    private void QuotesMenuItem_Click(object? sender, EventArgs e)
+    {
+        // Crea el formulario de presupuestos una sola vez.
+        quoteForm ??= new QuoteForm();
+        quoteForm.ShowAllQuotes();
+        ShowModule(quoteForm);
+    }
+
+    /// <summary>
+    /// Muestra el formulario de pedidos embebido en el área central. Desde
+    /// el menú siempre se ven todos (sin filtro).
+    /// </summary>
+    private void OrdersMenuItem_Click(object? sender, EventArgs e)
+    {
+        // Crea el formulario de pedidos una sola vez.
+        orderForm ??= new OrderForm();
+        orderForm.ShowAllOrders();
+        ShowModule(orderForm);
     }
 
     /// <summary>
@@ -94,6 +126,28 @@ public partial class MainForm : System.Windows.Forms.Form
         taskForm ??= new TaskForm();
         taskForm.ShowTasksOf(relatedType, relatedId, displayName);
         ShowModule(taskForm);
+    }
+
+    /// <summary>
+    /// Muestra el módulo de Presupuestos filtrado al cliente o futuro cliente
+    /// indicado (botón Presupuestos de ClientForm/ContactForm, specs/009 §7).
+    /// </summary>
+    private void ShowFilteredQuotes(Crm1.WindowsForms.Models.TaskRelatedType relatedType, Guid relatedId, string displayName)
+    {
+        quoteForm ??= new QuoteForm();
+        quoteForm.ShowQuotesOf(relatedType, relatedId, displayName);
+        ShowModule(quoteForm);
+    }
+
+    /// <summary>
+    /// Muestra el módulo de Pedidos filtrado al cliente indicado (botón
+    /// Pedidos de ClientForm, specs/009 §7).
+    /// </summary>
+    private void ShowFilteredOrders(Guid clientId, string displayName)
+    {
+        orderForm ??= new OrderForm();
+        orderForm.ShowOrdersOf(clientId, displayName);
+        ShowModule(orderForm);
     }
 
     /// <summary>
@@ -164,6 +218,38 @@ public partial class MainForm : System.Windows.Forms.Form
             if (!reminderForm.SelectReminderById(id))
             {
                 WarnNavigationBlocked("Recordatorios", "El recordatorio encontrado no está en la tabla de Recordatorios; puede haber cambios sin guardar.");
+            }
+        }
+        else if (module == SearchModule.Quote)
+        {
+            quoteForm ??= new QuoteForm();
+            if (quoteForm.IsEditing)
+            {
+                WarnNavigationBlocked("Presupuestos", "Hay una edición en curso en Presupuestos.\n\nCancela o guarda los cambios antes de ir al registro encontrado.");
+                return;
+            }
+
+            quoteForm.ShowAllQuotes();
+            ShowModule(quoteForm);
+            if (!quoteForm.SelectQuoteById(id))
+            {
+                WarnNavigationBlocked("Presupuestos", "El presupuesto encontrado no está en la tabla; puede estar fuera de la vista o haber cambios sin guardar.");
+            }
+        }
+        else if (module == SearchModule.Order)
+        {
+            orderForm ??= new OrderForm();
+            if (orderForm.IsEditing)
+            {
+                WarnNavigationBlocked("Pedidos", "Hay una edición en curso en Pedidos.\n\nCancela o guarda los cambios antes de ir al registro encontrado.");
+                return;
+            }
+
+            orderForm.ShowAllOrders();
+            ShowModule(orderForm);
+            if (!orderForm.SelectOrderById(id))
+            {
+                WarnNavigationBlocked("Pedidos", "El pedido encontrado no está en la tabla; puede estar fuera de la vista o haber cambios sin guardar.");
             }
         }
         else
@@ -348,6 +434,14 @@ public partial class MainForm : System.Windows.Forms.Form
         if (reminderForm?.HasUnsavedChanges == true)
         {
             unsavedModules.Add("Recordatorios");
+        }
+        if (quoteForm?.HasUnsavedChanges == true)
+        {
+            unsavedModules.Add("Presupuestos");
+        }
+        if (orderForm?.HasUnsavedChanges == true)
+        {
+            unsavedModules.Add("Pedidos");
         }
 
         if (e.Cancel)

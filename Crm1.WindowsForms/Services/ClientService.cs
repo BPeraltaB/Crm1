@@ -207,4 +207,40 @@ public sealed partial class ClientService
             errors.Add(new() { Field = nameof(Client.PostalCode), Message = "El código postal no corresponde a la ciudad." });
         }
     }
+
+    /// <summary>
+    /// Indica si un cliente coincide con el texto buscado del listado
+    /// (specs/002): coincidencia parcial, sin mayúsculas ni tildes, en las
+    /// columnas visibles. Un texto vacío deja pasar todo.
+    /// </summary>
+    public static bool MatchesFilter(Client client, string? text)
+    {
+        string normalized = SearchService.NormalizeText(text ?? string.Empty);
+        if (normalized.Length == 0)
+        {
+            return true;
+        }
+
+        return SearchableValues(client).Any(value =>
+            value.Length > 0 && SearchService.NormalizeText(value).Contains(normalized, StringComparison.Ordinal));
+    }
+
+    // Valores visibles de un cliente en el orden de las columnas de la tabla
+    // (los mismos campos que la búsqueda global, specs/004).
+    private static IEnumerable<string> SearchableValues(Client client)
+    {
+        yield return client.FirstName;
+        yield return client.LastName1;
+        yield return client.LastName2;
+        yield return client.TaxId;
+        yield return client.Phone;
+        yield return client.Email;
+        yield return client.Address;
+        yield return client.PostalCode;
+        yield return client.City;
+        yield return client.Province;
+        yield return client.Status == ClientStatus.Inactive ? "Inactivo" : "Activo";
+        yield return client.RegistrationDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        yield return client.Notes;
+    }
 }

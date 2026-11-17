@@ -83,6 +83,13 @@ public partial class ContactForm : System.Windows.Forms.Form
     public event Action<Guid, string>? TasksRequested;
 
     /// <summary>
+    /// Solicita abrir el módulo de Presupuestos filtrado al futuro cliente
+    /// marcado (specs/009 §7). Lo atiende MainForm. Pedidos no procede: un
+    /// futuro cliente con pedido ya sería cliente.
+    /// </summary>
+    public event Action<Guid, string>? QuotesRequested;
+
+    /// <summary>
     /// Diálogos del formulario (avisos, confirmaciones y errores): todo pasa
     /// por aquí. En la aplicación es un MessageBox con este formulario como
     /// dueño; las pruebas automatizadas de interfaz lo sustituyen por un
@@ -232,6 +239,11 @@ public partial class ContactForm : System.Windows.Forms.Form
         cancelButton.Enabled = _canSave && editing;
         convertButton.Enabled = _canSave && !editing;
         tasksButton.Enabled = _canSave && !editing;
+        quotesButton.Enabled = _canSave && !editing;
+
+        // La caja de búsqueda también queda bloqueada mientras hay edición
+        // (skill «modificar»: nada cambia la vista durante la edición).
+        searchTextBox.Enabled = _canSave && !editing;
     }
 
     /// <summary>
@@ -295,7 +307,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
         SetColumnsSortable(true);
         UpdateButtonStates();
-        UpdateCounter();
+        ApplyFilter();
     }
 
     /// <summary>
@@ -358,33 +370,89 @@ public partial class ContactForm : System.Windows.Forms.Form
         contactsDataGridView.ClearSelection();
 
         // Actualiza el contador del listado.
-        UpdateCounter();
+        ApplyFilter();
     }
 
     /// <summary>
-    /// Actualiza el contador del listado (specs/003). Sin filtro local — la
-    /// búsqueda se hace desde el formulario principal (specs/004) — todas las
-    /// filas están visibles y cuenta cuántas filas con datos hay en la tabla.
+    /// Aplica el filtro del listado (specs/003): quedan visibles las filas que
+    /// cumplen el texto buscado (parcial, sin mayúsculas ni tildes, en las
+    /// columnas visibles; la fecha vacía no se busca) y el contador muestra
+    /// cuántas se ven de cuántas hay. Las filas solo se ocultan: Guardar
+    /// conserva también las ocultas.
     /// </summary>
-    private void UpdateCounter()
+    private void ApplyFilter()
     {
         if (_loading)
         {
             return;
         }
 
+        string text = searchTextBox.Text;
+
+        // Se recuerda el futuro cliente actual porque al soltar la celda o la
+        // selección el evento SelectionChanged limpia la marca; se restaura al
+        // final si su fila sigue visible.
+        Guid? currentId = _currentContactId;
+
+        int visibleCount = 0;
         int totalCount = 0;
         foreach (System.Windows.Forms.DataGridViewRow row in contactsDataGridView.Rows)
         {
-            row.Visible = true;
-            if (!IsEmptyRow(row))
+            // Las filas vacías (solo posibles con edición abierta) se dejan ver.
+            if (IsEmptyRow(row))
             {
-                totalCount++;
+                row.Visible = true;
+                continue;
+            }
+
+            totalCount++;
+            bool matches = ContactService.MatchesFilter(MapRowToContact(row, out _), text);
+
+            // La celda actual se suelta antes de ocultar su fila: el control no
+            // permite ocultar la fila que la contiene.
+            if (!matches && contactsDataGridView.CurrentCell?.OwningRow == row)
+            {
+                contactsDataGridView.CurrentCell = null;
+                contactsDataGridView.ClearSelection();
+            }
+
+            row.Visible = matches;
+            if (matches)
+            {
+                visibleCount++;
             }
         }
 
-        counterLabel.Text = $"Mostrando {totalCount} de {totalCount}";
+        counterLabel.Text = $"Mostrando {visibleCount} de {totalCount}";
+
+        // Si el futuro cliente actual quedó oculto por el filtro, la marca se
+        // retira (volverá a marcarse con un clic cuando vuelva a verse); si
+        // sigue visible, conserva la selección (skill «seleccionar-cliente»).
+        System.Windows.Forms.DataGridViewRow? currentRow = FindRowById(currentId);
+        if (currentRow is null || !currentRow.Visible)
+        {
+            contactsDataGridView.ClearSelection();
+            _currentContactId = null;
+        }
+        else
+        {
+            _currentContactId = currentId;
+            _restoringSelection = true;
+            try
+            {
+                currentRow.Selected = true;
+            }
+            finally
+            {
+                _restoringSelection = false;
+            }
+        }
     }
+
+    /// <summary>
+    /// Vuelve a aplicar el filtro al cambiar el texto buscado (búsqueda en vivo).
+    /// </summary>
+    private void SearchTextBox_TextChanged(object? sender, EventArgs e) => ApplyFilter();
 
     /// <summary>
     /// Añade a la tabla una fila con los datos de un futuro cliente guardado.
@@ -522,7 +590,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         // El contador debe reflejar la fila retirada también sin edición
         // abierta (EndEditingSession vuelve pronto si no hay sesión); igual
         // que ClientForm y TaskForm.
-        UpdateCounter();
+        ApplyFilter();
     }
 
     /// <summary>
@@ -566,6 +634,31 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
 
         TasksRequested?.Invoke(_currentContactId!.Value, RowDisplayName(row));
+    }
+
+    /// <summary>
+    /// Abre el módulo de Presupuestos filtrado al futuro cliente marcado
+    /// (specs/009 §7): lanza el evento que atiende MainForm. Sin selección,
+    /// aviso.
+    /// </summary>
+    private void QuotesButton_Click(object? sender, EventArgs e)
+    {
+        if (!_canSave || _activeRow is not null)
+        {
+            return;
+        }
+
+        System.Windows.Forms.DataGridViewRow? row = FindRowById(_currentContactId);
+        if (row is null)
+        {
+            Prompt(
+                "Selecciona un futuro cliente de la tabla.",
+                "CRM1 — Presupuestos",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        QuotesRequested?.Invoke(_currentContactId!.Value, RowDisplayName(row));
     }
 
     /// <summary>
@@ -639,7 +732,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         contactsDataGridView.Rows.Remove(row);
         EnsureCurrentContactExists();
         _dirty = true;
-        UpdateCounter();
+        ApplyFilter();
     }
 
     /// <summary>
@@ -701,7 +794,7 @@ public partial class ContactForm : System.Windows.Forms.Form
             _convertedContacts.Clear();
             _dirty = GridDiffersFromSaved();
             EnsureCurrentContactExists();
-            UpdateCounter();
+            ApplyFilter();
             return;
         }
 
@@ -884,7 +977,7 @@ public partial class ContactForm : System.Windows.Forms.Form
 
         // Sin sesión de edición (p. ej. solo se eliminó una fila),
         // EndEditingSession vuelve pronto: el contador se refresca aquí.
-        UpdateCounter();
+        ApplyFilter();
 
         Prompt(
             convertedCount > 0

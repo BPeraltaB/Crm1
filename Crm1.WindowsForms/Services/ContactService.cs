@@ -245,4 +245,44 @@ public sealed partial class ContactService
         nameof(Client.RegistrationDate) => "Fecha de alta",
         _ => field
     };
+
+    /// <summary>
+    /// Indica si un futuro cliente coincide con el texto buscado del listado
+    /// (specs/003): coincidencia parcial, sin mayúsculas ni tildes, en las
+    /// columnas visibles; la fecha vacía no se busca. Un texto vacío deja
+    /// pasar todo.
+    /// </summary>
+    public static bool MatchesFilter(Contact contact, string? text)
+    {
+        string normalized = SearchService.NormalizeText(text ?? string.Empty);
+        if (normalized.Length == 0)
+        {
+            return true;
+        }
+
+        return SearchableValues(contact).Any(value =>
+            value.Length > 0 && SearchService.NormalizeText(value).Contains(normalized, StringComparison.Ordinal));
+    }
+
+    // Valores visibles de un futuro cliente en el orden de las columnas de la
+    // tabla; la fecha vacía no se busca (igual que la búsqueda global).
+    private static IEnumerable<string> SearchableValues(Contact contact)
+    {
+        yield return contact.FirstName;
+        yield return contact.LastName1;
+        yield return contact.LastName2;
+        yield return contact.TaxId;
+        yield return contact.Phone;
+        yield return contact.Email;
+        yield return contact.Address;
+        yield return contact.PostalCode;
+        yield return contact.City;
+        yield return contact.Province;
+        yield return contact.Status == ContactStatus.Discarded ? "Descartado" : "Pendiente";
+        if (contact.RegistrationDate != default)
+        {
+            yield return contact.RegistrationDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        }
+        yield return contact.Notes;
+    }
 }
