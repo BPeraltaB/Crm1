@@ -145,6 +145,40 @@ public sealed class QuoteService
     };
 
     /// <summary>
+    /// Indica si un presupuesto pasa el filtro del listado (specs/009 §3):
+    /// coincidencia parcial, sin mayúsculas ni tildes, en las columnas
+    /// visibles — relatedName es el texto del vínculo tal como se muestra.
+    /// Un texto vacío deja pasar todo.
+    /// </summary>
+    public static bool MatchesFilter(Quote quote, string? text, string relatedName)
+    {
+        string normalized = SearchService.NormalizeText(text ?? string.Empty);
+        if (normalized.Length == 0)
+        {
+            return true;
+        }
+
+        return SearchableValues(quote, relatedName).Any(value =>
+            value.Length > 0 && SearchService.NormalizeText(value).Contains(normalized, StringComparison.Ordinal));
+    }
+
+    // Valores visibles de un presupuesto en el orden de las columnas.
+    private static IEnumerable<string> SearchableValues(Quote quote, string relatedName)
+    {
+        yield return quote.QuoteDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        yield return SpanishPrice.Format(quote.Amount);
+        yield return quote.Reference;
+        yield return quote.Description;
+        yield return quote.Status switch
+        {
+            QuoteStatus.Accepted => "Aceptado",
+            QuoteStatus.Dismissed => "Descartado",
+            _ => "Pendiente"
+        };
+        yield return relatedName;
+    }
+
+    /// <summary>
     /// Presupuestos que están hoy en un día de aviso (15, 23, 27, 28, 29 o
     /// 30), con los días que les faltan para caducar (0 = último día).
     /// Aceptados, Descartados y fechas futuras nunca avisan; los Aceptados de

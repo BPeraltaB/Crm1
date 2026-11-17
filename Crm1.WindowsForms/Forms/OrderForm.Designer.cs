@@ -37,6 +37,8 @@ partial class OrderForm
         this.saveButton = new System.Windows.Forms.Button();
         this.cancelButton = new System.Windows.Forms.Button();
         this.filterPanel = new System.Windows.Forms.Panel();
+        this.searchLabel = new System.Windows.Forms.Label();
+        this.searchTextBox = new System.Windows.Forms.TextBox();
         this.yearLabel = new System.Windows.Forms.Label();
         this.yearFilterComboBox = new System.Windows.Forms.ComboBox();
         this.showAllButton = new System.Windows.Forms.Button();
@@ -123,6 +125,8 @@ partial class OrderForm
         // filterPanel
         //
         this.filterPanel.BackColor = System.Drawing.Color.FromArgb(243, 244, 246);
+        this.filterPanel.Controls.Add(this.searchLabel);
+        this.filterPanel.Controls.Add(this.searchTextBox);
         this.filterPanel.Controls.Add(this.yearLabel);
         this.filterPanel.Controls.Add(this.yearFilterComboBox);
         this.filterPanel.Controls.Add(this.showAllButton);
@@ -135,27 +139,43 @@ partial class OrderForm
         this.filterPanel.Size = new System.Drawing.Size(1200, 40);
         this.filterPanel.TabIndex = 5;
         //
+        // searchLabel
+        //
+        this.searchLabel.Location = new System.Drawing.Point(10, 9);
+        this.searchLabel.Name = "searchLabel";
+        this.searchLabel.Size = new System.Drawing.Size(45, 20);
+        this.searchLabel.Text = "Buscar:";
+        //
+        // searchTextBox
+        // Búsqueda en vivo del listado (parcial, sin mayúsculas ni tildes).
+        //
+        this.searchTextBox.Location = new System.Drawing.Point(60, 6);
+        this.searchTextBox.Name = "searchTextBox";
+        this.searchTextBox.Size = new System.Drawing.Size(170, 23);
+        this.searchTextBox.TabIndex = 0;
+        this.searchTextBox.TextChanged += new System.EventHandler(this.SearchTextBox_TextChanged);
+        //
         // yearLabel
         //
-        this.yearLabel.Location = new System.Drawing.Point(10, 9);
+        this.yearLabel.Location = new System.Drawing.Point(240, 9);
         this.yearLabel.Name = "yearLabel";
-        this.yearLabel.Size = new System.Drawing.Size(40, 20);
+        this.yearLabel.Size = new System.Drawing.Size(35, 20);
         this.yearLabel.Text = "Año:";
         //
         // yearFilterComboBox
         // «Todos» (por defecto) y los años presentes en los pedidos.
         //
         this.yearFilterComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-        this.yearFilterComboBox.Location = new System.Drawing.Point(55, 6);
+        this.yearFilterComboBox.Location = new System.Drawing.Point(280, 6);
         this.yearFilterComboBox.Name = "yearFilterComboBox";
-        this.yearFilterComboBox.Size = new System.Drawing.Size(100, 23);
+        this.yearFilterComboBox.Size = new System.Drawing.Size(85, 23);
         this.yearFilterComboBox.TabIndex = 1;
         this.yearFilterComboBox.SelectedIndexChanged += new System.EventHandler(this.YearFilterComboBox_SelectedIndexChanged);
         //
         // showAllButton
         // Quita el filtro y vuelve a mostrar todos los pedidos.
         //
-        this.showAllButton.Location = new System.Drawing.Point(175, 6);
+        this.showAllButton.Location = new System.Drawing.Point(375, 6);
         this.showAllButton.Name = "showAllButton";
         this.showAllButton.Size = new System.Drawing.Size(90, 27);
         this.showAllButton.TabIndex = 2;
@@ -166,9 +186,9 @@ partial class OrderForm
         // filterLabel
         // Aviso «Pedidos de: (Cliente) Ana»; visible solo con filtro activo.
         //
-        this.filterLabel.Location = new System.Drawing.Point(275, 9);
+        this.filterLabel.Location = new System.Drawing.Point(475, 9);
         this.filterLabel.Name = "filterLabel";
-        this.filterLabel.Size = new System.Drawing.Size(400, 20);
+        this.filterLabel.Size = new System.Drawing.Size(210, 20);
         this.filterLabel.TabIndex = 3;
         this.filterLabel.Visible = false;
         //
@@ -176,9 +196,9 @@ partial class OrderForm
         // Pedidos, abonos y neto según el año y el cliente filtrados.
         //
         this.totalsLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-        this.totalsLabel.Location = new System.Drawing.Point(480, 9);
+        this.totalsLabel.Location = new System.Drawing.Point(690, 9);
         this.totalsLabel.Name = "totalsLabel";
-        this.totalsLabel.Size = new System.Drawing.Size(490, 20);
+        this.totalsLabel.Size = new System.Drawing.Size(280, 20);
         this.totalsLabel.TabIndex = 4;
         this.totalsLabel.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
         //
@@ -292,6 +312,8 @@ partial class OrderForm
     private System.Windows.Forms.Button saveButton;
     private System.Windows.Forms.Button cancelButton;
     private System.Windows.Forms.Panel filterPanel;
+    private System.Windows.Forms.Label searchLabel;
+    private System.Windows.Forms.TextBox searchTextBox;
     private System.Windows.Forms.Label yearLabel;
     private System.Windows.Forms.ComboBox yearFilterComboBox;
     private System.Windows.Forms.Button showAllButton;

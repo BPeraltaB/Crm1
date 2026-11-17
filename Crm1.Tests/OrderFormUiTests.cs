@@ -244,6 +244,41 @@ public sealed class OrderFormUiTests
     }
 
     [Fact]
+    public void Search_box_filters_by_kind_and_client_and_recomputes_totals()
+    {
+        Client ana = Fixtures.Client("Ana", "12345678Z");
+        Client luis = Fixtures.Client("Luis", "23456781R");
+        UiTestEnvironment.WriteClients(ana, luis);
+        UiTestEnvironment.WriteContacts();
+        UiTestEnvironment.WriteOrders(
+            OrderOf(ana.Id, new DateTime(2026, 11, 15), amount: 1000m, description: "Mobiliario"),
+            OrderOf(luis.Id, new DateTime(2026, 11, 10), OrderKind.CreditNote, 150m, "Devolución de sillas"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new OrderForm(new PromptRecorder().Answer);
+            DataGridView grid = FormAccess.Grid(form, "ordersDataGridView");
+            TextBox search = FormAccess.TextBox(form, "searchTextBox");
+
+            // Por tipo: solo el abono, y los totales se recalculan con él
+            // (el neto negativo usa el signo menos del formato numérico).
+            search.Text = "abono";
+            Assert.Equal("Mostrando 1 de 2", FormAccess.Label(form, "counterLabel").Text);
+            Assert.StartsWith("0 pedido(s) — 0,00 € · 1 abono(s) — −150,00 € · Neto: -150,00 €",
+                FormAccess.Label(form, "totalsLabel").Text);
+
+            // Por cliente: solo los movimientos de Ana.
+            search.Text = "ana";
+            Assert.Equal("Mostrando 1 de 2", FormAccess.Label(form, "counterLabel").Text);
+            Assert.StartsWith("1 pedido(s) — 1.000,00 € · 0 abono(s)",
+                FormAccess.Label(form, "totalsLabel").Text);
+
+            search.Text = string.Empty;
+            Assert.Equal("Mostrando 2 de 2", FormAccess.Label(form, "counterLabel").Text);
+        });
+    }
+
+    [Fact]
     public void SelectOrderById_marks_the_order_and_rejects_unknown_ids()
     {
         Client ana = Fixtures.Client("Ana", "12345678Z");

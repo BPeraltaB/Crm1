@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Crm1.WindowsForms.Models;
 using Crm1.WindowsForms.Services;
 
@@ -275,7 +275,7 @@ public partial class OrderForm : System.Windows.Forms.Form
         _currentOrderId = null;
         ordersDataGridView.ClearSelection();
         PopulateYearFilter(visible);
-        ApplyYearFilter();
+        ApplyFilters();
         UpdateButtonStates();
     }
 
@@ -378,20 +378,35 @@ public partial class OrderForm : System.Windows.Forms.Form
     }
 
     /// <summary>
-    /// Aplica el filtro de año: quedan visibles las filas del año elegido (o
-    /// todas con «Todos») y el contador y los totales se recalculan con lo
-    /// visible (specs/009 §4.2).
+    /// Aplica los filtros del listado (specs/009 §§3-4.2): el texto busca en
+    /// las columnas visibles (parcial, sin mayúsculas ni tildes) y el año
+    /// deja ver solo el suyo; combinables con la vista filtrada por cliente.
+    /// Las filas solo se ocultan: Guardar conserva también las ocultas, y si
+    /// el movimiento marcado queda oculto, la marca se retira. Los totales
+    /// se recalculan con lo visible.
     /// </summary>
-    private void ApplyYearFilter()
+    private void ApplyFilters()
     {
+        if (_loading)
+        {
+            return;
+        }
+
+        string text = searchTextBox.Text;
         string yearText = yearFilterComboBox.SelectedItem?.ToString() ?? "Todos";
-        bool all = yearText == "Todos";
+        bool allYears = yearText == "Todos";
+
+        // Se recuerda el movimiento actual porque al soltar la celda o la
+        // selección el evento SelectionChanged limpia la marca; se restaura
+        // al final si su fila sigue visible.
+        Guid? currentId = _currentOrderId;
 
         int visibleCount = 0;
         int totalCount = 0;
         var visibleOrders = new List<Order>();
         foreach (System.Windows.Forms.DataGridViewRow row in ordersDataGridView.Rows)
         {
+            // Las filas vacías (solo posibles con edición abierta) se dejan ver.
             if (IsEmptyRow(row))
             {
                 row.Visible = true;
@@ -399,8 +414,18 @@ public partial class OrderForm : System.Windows.Forms.Form
             }
 
             totalCount++;
-            bool matches = all || CellText(row, "orderDateColumn").EndsWith(
-                $"/{yearText}", StringComparison.Ordinal);
+            bool matches = (allYears || CellText(row, "orderDateColumn").EndsWith(
+                $"/{yearText}", StringComparison.Ordinal))
+                && OrderService.MatchesFilter(MapRowToOrder(row, out _), text, CellText(row, "clientColumn"));
+
+            // La celda actual se suelta antes de ocultar su fila: el control
+            // no permite ocultar la fila que la contiene.
+            if (!matches && ordersDataGridView.CurrentCell?.OwningRow == row)
+            {
+                ordersDataGridView.CurrentCell = null;
+                ordersDataGridView.ClearSelection();
+            }
+
             row.Visible = matches;
             if (matches)
             {
@@ -413,17 +438,31 @@ public partial class OrderForm : System.Windows.Forms.Form
 
         (int orderCount, decimal orderTotal, int creditNoteCount, decimal creditNoteTotal, decimal net) =
             OrderService.Totals(visibleOrders);
-        totalsLabel.Text = all
+        totalsLabel.Text = allYears
             ? $"{orderCount} pedido(s) — {SpanishPrice.Format(orderTotal)} € · " +
                 $"{creditNoteCount} abono(s) — −{SpanishPrice.Format(creditNoteTotal)} € · " +
                 $"Neto: {SpanishPrice.Format(net)} €"
             : $"{yearText}: {orderCount} pedido(s) — {SpanishPrice.Format(orderTotal)} € · " +
                 $"{creditNoteCount} abono(s) — −{SpanishPrice.Format(creditNoteTotal)} € · " +
                 $"Neto: {SpanishPrice.Format(net)} €";
+
+        // Si el movimiento actual quedó oculto por el filtro, la marca se
+        // retira (volverá a marcarse con un clic cuando vuelva a verse).
+        System.Windows.Forms.DataGridViewRow? currentRow = FindRowById(currentId);
+        if (currentRow is null || !currentRow.Visible)
+        {
+            _currentOrderId = null;
+            ordersDataGridView.ClearSelection();
+        }
     }
 
     /// <summary>
-    /// Vuelve a aplicar el filtro de año al cambiar el desplegable.
+    /// Vuelve a aplicar los filtros al cambiar el texto buscado (en vivo).
+    /// </summary>
+    private void SearchTextBox_TextChanged(object? sender, EventArgs e) => ApplyFilters();
+
+    /// <summary>
+    /// Vuelve a aplicar los filtros al cambiar el año del desplegable.
     /// </summary>
     private void YearFilterComboBox_SelectedIndexChanged(object? sender, EventArgs e)
     {
@@ -432,7 +471,7 @@ public partial class OrderForm : System.Windows.Forms.Form
             return;
         }
 
-        ApplyYearFilter();
+        ApplyFilters();
     }
 
     /// <summary>
@@ -451,6 +490,7 @@ public partial class OrderForm : System.Windows.Forms.Form
         saveButton.Enabled = _canSave;
         cancelButton.Enabled = _canSave && editing;
         yearFilterComboBox.Enabled = _canSave && !editing;
+        searchTextBox.Enabled = _canSave && !editing;
     }
 
     /// <summary>
@@ -545,7 +585,7 @@ public partial class OrderForm : System.Windows.Forms.Form
         }
         SetColumnsSortable(true);
         UpdateButtonStates();
-        ApplyYearFilter();
+        ApplyFilters();
     }
 
     /// <summary>
@@ -644,7 +684,7 @@ public partial class OrderForm : System.Windows.Forms.Form
 
         // Los totales y el contador deben reflejar la fila retirada también
         // sin edición abierta.
-        ApplyYearFilter();
+        ApplyFilters();
     }
 
     /// <summary>
@@ -701,7 +741,7 @@ public partial class OrderForm : System.Windows.Forms.Form
         // Recalcula si quedan otros cambios sin guardar (comparación con la
         // última copia guardada) para que el aviso al cerrar nunca mienta.
         _dirty = GridDiffersFromSaved();
-        ApplyYearFilter();
+        ApplyFilters();
     }
 
     /// <summary>
@@ -828,7 +868,7 @@ public partial class OrderForm : System.Windows.Forms.Form
         // La vista queda ordenada por fecha descendente (specs/009 §3).
         SortByDateDescending();
 
-        ApplyYearFilter();
+        ApplyFilters();
 
         Prompt(
             $"Se han guardado {orders.Count} pedido(s)/abono(s) correctamente.",

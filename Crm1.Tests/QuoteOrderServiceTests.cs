@@ -302,6 +302,54 @@ public sealed class QuoteOrderServiceTests
         Assert.Empty(QuoteService.GetExpired(new[] { withOrder }, DateTime.Today));
     }
 
+    // Filtro de los listados (specs/009 §3).
+
+    [Fact]
+    public void Quote_MatchesFilter_searches_every_visible_field()
+    {
+        Quote quote = ValidQuote(q =>
+        {
+            q.Amount = 1200.56m;
+            q.Reference = "P-2026-0142";
+            q.Description = "Mobiliario de oficina";
+            q.Status = QuoteStatus.Accepted;
+        });
+
+        Assert.True(QuoteService.MatchesFilter(quote, "   ", "(Cliente) Ana"));
+        Assert.True(QuoteService.MatchesFilter(quote, "mobiliario", "(Cliente) Ana"));
+        Assert.True(QuoteService.MatchesFilter(quote, "1.200,56", "(Cliente) Ana"));
+        Assert.True(QuoteService.MatchesFilter(quote, "0142", "(Cliente) Ana"));
+        Assert.True(QuoteService.MatchesFilter(quote, "aceptado", "(Cliente) Ana"));
+        Assert.True(QuoteService.MatchesFilter(quote, "ana", "(Cliente) Ana García"));
+        Assert.False(QuoteService.MatchesFilter(quote, "zzz", "(Cliente) Ana"));
+    }
+
+    [Fact]
+    public void Quote_MatchesFilter_matches_the_date_in_spanish_format()
+    {
+        Quote quote = ValidQuote(q => q.QuoteDate = new DateTime(2026, 11, 15));
+
+        Assert.True(QuoteService.MatchesFilter(quote, "15/11/2026", "—"));
+    }
+
+    [Fact]
+    public void Order_MatchesFilter_searches_every_visible_field()
+    {
+        Order order = ValidOrder(o =>
+        {
+            o.Kind = OrderKind.CreditNote;
+            o.Amount = 150m;
+            o.Reference = "A-2026-0012";
+            o.Description = "Devolución de sillas";
+        });
+
+        Assert.True(OrderService.MatchesFilter(order, "abono", "(Cliente) Ana"));
+        Assert.True(OrderService.MatchesFilter(order, "150,00", "(Cliente) Ana"));
+        Assert.True(OrderService.MatchesFilter(order, "devolucion", "(Cliente) Ana"));
+        Assert.True(OrderService.MatchesFilter(order, "garcia", "(Cliente) Ana García"));
+        Assert.False(OrderService.MatchesFilter(order, "presupuesto", "(Cliente) Ana"));
+    }
+
     // Totales con abonos (specs/009 §4.2).
     [Fact]
     public void Totals_subtract_credit_notes_from_orders()

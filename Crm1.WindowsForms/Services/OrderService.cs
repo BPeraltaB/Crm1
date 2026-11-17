@@ -150,4 +150,33 @@ public sealed class OrderService
 
         return (orderCount, orderTotal, creditNoteCount, creditNoteTotal, orderTotal - creditNoteTotal);
     }
+
+    /// <summary>
+    /// Indica si un pedido o abono pasa el filtro del listado (specs/009 §3):
+    /// coincidencia parcial, sin mayúsculas ni tildes, en las columnas
+    /// visibles — clientName es el texto del cliente tal como se muestra.
+    /// Un texto vacío deja pasar todo.
+    /// </summary>
+    public static bool MatchesFilter(Order order, string? text, string clientName)
+    {
+        string normalized = SearchService.NormalizeText(text ?? string.Empty);
+        if (normalized.Length == 0)
+        {
+            return true;
+        }
+
+        return SearchableValues(order, clientName).Any(value =>
+            value.Length > 0 && SearchService.NormalizeText(value).Contains(normalized, StringComparison.Ordinal));
+    }
+
+    // Valores visibles de un movimiento en el orden de las columnas.
+    private static IEnumerable<string> SearchableValues(Order order, string clientName)
+    {
+        yield return order.Kind == OrderKind.CreditNote ? "Abono" : "Pedido";
+        yield return order.OrderDate.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        yield return SpanishPrice.Format(order.Amount);
+        yield return order.Reference;
+        yield return order.Description;
+        yield return clientName;
+    }
 }

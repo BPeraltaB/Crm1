@@ -27,13 +27,13 @@ public sealed class QuoteFormUiTests
     private static Quote QuoteOf(Guid relatedId, DateTime date,
         TaskRelatedType relatedType = TaskRelatedType.Client,
         QuoteStatus status = QuoteStatus.Pending, Guid? orderId = null,
-        decimal amount = 1200.56m) => new()
+        decimal amount = 1200.56m, string description = "Mobiliario de oficina") => new()
     {
         Id = Guid.NewGuid(),
         QuoteDate = date,
         Amount = amount,
         Reference = "P-2026-0142",
-        Description = "Mobiliario de oficina",
+        Description = description,
         Status = status,
         RelatedId = relatedId,
         RelatedType = relatedType,
@@ -623,6 +623,50 @@ public sealed class QuoteFormUiTests
             Assert.Null(saved.OrderId);
             Assert.Empty(UiTestEnvironment.ReadOrders());
             Assert.Single(UiTestEnvironment.ReadContacts());
+        });
+    }
+
+    [Fact]
+    public void Search_box_filters_rows_combines_with_the_year_and_clears_the_mark()
+    {
+        Client ana = Fixtures.Client("Ana", "12345678Z");
+        UiTestEnvironment.WriteClients(ana);
+        UiTestEnvironment.WriteContacts();
+        UiTestEnvironment.WriteQuotes(
+            QuoteOf(ana.Id, new DateTime(2026, 11, 15), description: "Mobiliario de oficina"),
+            QuoteOf(ana.Id, new DateTime(2026, 10, 5), description: "Sillas ergonómicas"),
+            QuoteOf(ana.Id, new DateTime(2025, 12, 20), description: "Instalación de tarima"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new QuoteForm(new PromptRecorder().Answer);
+            DataGridView grid = FormAccess.Grid(form, "quotesDataGridView");
+            TextBox search = FormAccess.TextBox(form, "searchTextBox");
+            ComboBox yearFilter = FormAccess.ComboBox(form, "yearFilterComboBox");
+
+            // Palabra parcial sin tildes: deja una sola fila visible.
+            search.Text = "mobiliario";
+            Assert.Equal("Mostrando 1 de 3", FormAccess.Label(form, "counterLabel").Text);
+            search.Text = string.Empty;
+
+            // Marca una fila y el filtro la oculta: la marca se retira.
+            grid.CurrentCell = grid.Rows[1].Cells["quoteDateColumn"];
+            Assert.NotNull(form.CurrentQuoteId);
+            search.Text = "zzz";
+            Assert.Equal("Mostrando 0 de 3", FormAccess.Label(form, "counterLabel").Text);
+            Assert.Null(form.CurrentQuoteId);
+            Assert.False(FormAccess.Button(form, "acceptButton").Enabled);
+
+            // Combinable con el año y recuperable al limpiar.
+            search.Text = string.Empty;
+            yearFilter.SelectedIndex = yearFilter.Items.IndexOf("2025");
+            Assert.Equal("Mostrando 1 de 3", FormAccess.Label(form, "counterLabel").Text);
+            yearFilter.SelectedIndex = 0;
+            Assert.Equal("Mostrando 3 de 3", FormAccess.Label(form, "counterLabel").Text);
+
+            // Bloqueado durante la edición, como el año.
+            FormAccess.Click(form, "NewButton_Click");
+            Assert.False(search.Enabled);
         });
     }
 

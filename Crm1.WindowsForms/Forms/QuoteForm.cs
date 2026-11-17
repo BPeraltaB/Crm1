@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Crm1.WindowsForms.Models;
 using Crm1.WindowsForms.Services;
 
@@ -329,7 +329,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
         _currentQuoteId = null;
         quotesDataGridView.ClearSelection();
         PopulateYearFilter(visible);
-        ApplyYearFilter();
+        ApplyFilters();
         UpdateButtonStates();
     }
 
@@ -448,20 +448,34 @@ public partial class QuoteForm : System.Windows.Forms.Form
     }
 
     /// <summary>
-    /// Aplica el filtro de año y refresca el contador y los totales con lo
-    /// visible: «N presupuesto(s) — M aceptado(s)» según el año y el cliente
-    /// filtrados (specs/009 §4.2).
+    /// Aplica los filtros del listado (specs/009 §§3-4.2): el texto busca en
+    /// las columnas visibles (parcial, sin mayúsculas ni tildes) y el año
+    /// deja ver solo el suyo; combinables con la vista filtrada por registro.
+    /// Las filas solo se ocultan: Guardar conserva también las ocultas, y si
+    /// el presupuesto marcado queda oculto, la marca se retira.
     /// </summary>
-    private void ApplyYearFilter()
+    private void ApplyFilters()
     {
+        if (_loading)
+        {
+            return;
+        }
+
+        string text = searchTextBox.Text;
         string yearText = yearFilterComboBox.SelectedItem?.ToString() ?? "Todos";
-        bool all = yearText == "Todos";
+        bool allYears = yearText == "Todos";
+
+        // Se recuerda el presupuesto actual porque al soltar la celda o la
+        // selección el evento SelectionChanged limpia la marca; se restaura
+        // al final si su fila sigue visible.
+        Guid? currentId = _currentQuoteId;
 
         int visibleCount = 0;
         int totalCount = 0;
         int acceptedCount = 0;
         foreach (System.Windows.Forms.DataGridViewRow row in quotesDataGridView.Rows)
         {
+            // Las filas vacías (solo posibles con edición abierta) se dejan ver.
             if (IsEmptyRow(row))
             {
                 row.Visible = true;
@@ -469,8 +483,18 @@ public partial class QuoteForm : System.Windows.Forms.Form
             }
 
             totalCount++;
-            bool matches = all || CellText(row, "quoteDateColumn").EndsWith(
-                $"/{yearText}", StringComparison.Ordinal);
+            bool matches = (allYears || CellText(row, "quoteDateColumn").EndsWith(
+                $"/{yearText}", StringComparison.Ordinal))
+                && QuoteService.MatchesFilter(MapRowToQuote(row, out _), text, CellText(row, "relatedColumn"));
+
+            // La celda actual se suelta antes de ocultar su fila: el control
+            // no permite ocultar la fila que la contiene.
+            if (!matches && quotesDataGridView.CurrentCell?.OwningRow == row)
+            {
+                quotesDataGridView.CurrentCell = null;
+                quotesDataGridView.ClearSelection();
+            }
+
             row.Visible = matches;
             if (matches)
             {
@@ -483,13 +507,29 @@ public partial class QuoteForm : System.Windows.Forms.Form
         }
 
         counterLabel.Text = $"Mostrando {visibleCount} de {totalCount}";
-        totalsLabel.Text = all
+        totalsLabel.Text = allYears
             ? $"{totalCount} presupuesto(s) — {acceptedCount} aceptado(s)"
             : $"{yearText}: {visibleCount} presupuesto(s) — {acceptedCount} aceptado(s)";
+
+        // Si el presupuesto actual quedó oculto por el filtro, la marca se
+        // retira (volverá a marcarse con un clic cuando vuelva a verse).
+        System.Windows.Forms.DataGridViewRow? currentRow = FindRowById(currentId);
+        if (currentRow is null || !currentRow.Visible)
+        {
+            _currentQuoteId = null;
+            quotesDataGridView.ClearSelection();
+        }
+
+        UpdateAcceptButton();
     }
 
     /// <summary>
-    /// Vuelve a aplicar el filtro de año al cambiar el desplegable.
+    /// Vuelve a aplicar los filtros al cambiar el texto buscado (en vivo).
+    /// </summary>
+    private void SearchTextBox_TextChanged(object? sender, EventArgs e) => ApplyFilters();
+
+    /// <summary>
+    /// Vuelve a aplicar los filtros al cambiar el año del desplegable.
     /// </summary>
     private void YearFilterComboBox_SelectedIndexChanged(object? sender, EventArgs e)
     {
@@ -498,7 +538,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
             return;
         }
 
-        ApplyYearFilter();
+        ApplyFilters();
     }
 
     /// <summary>
@@ -516,6 +556,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
         saveButton.Enabled = _canSave;
         cancelButton.Enabled = _canSave && editing;
         yearFilterComboBox.Enabled = _canSave && !editing;
+        searchTextBox.Enabled = _canSave && !editing;
         UpdateAcceptButton();
     }
 
@@ -650,7 +691,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
         }
         SetColumnsSortable(true);
         UpdateButtonStates();
-        ApplyYearFilter();
+        ApplyFilters();
     }
 
     /// <summary>
@@ -748,7 +789,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
 
         // Totales y contador deben reflejar la fila retirada también sin
         // edición abierta.
-        ApplyYearFilter();
+        ApplyFilters();
         UpdateAcceptButton();
     }
 
@@ -859,7 +900,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
             _quoteOrderIds[quote.Id] = order.Id;
             _dirty = true;
 
-            ApplyYearFilter();
+            ApplyFilters();
             UpdateAcceptButton();
             Prompt(
                 "El presupuesto queda Aceptado y el pedido se creará al pulsar Guardar.",
@@ -979,7 +1020,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
             _quoteOrderIds[quote.Id] = order.Id;
             _dirty = true;
 
-            ApplyYearFilter();
+            ApplyFilters();
             UpdateAcceptButton();
             Prompt(
                 "Al guardar se dará de alta al cliente, se reasignarán sus tareas, recordatorios y " +
@@ -1247,7 +1288,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
             _conversionClient = null;
             _dirty = GridDiffersFromSaved();
 
-            ApplyYearFilter();
+            ApplyFilters();
             UpdateAcceptButton();
             return;
         }
@@ -1280,7 +1321,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
         // Recalcula si quedan otros cambios sin guardar (comparación con la
         // última copia guardada) para que el aviso al cerrar nunca mienta.
         _dirty = GridDiffersFromSaved() || _pendingOrders.Count > 0 || _conversionClient is not null;
-        ApplyYearFilter();
+        ApplyFilters();
     }
 
     /// <summary>
@@ -1510,7 +1551,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
 
             // La vista queda ordenada por fecha descendente (specs/009 §3).
             SortByDateDescending();
-            ApplyYearFilter();
+            ApplyFilters();
         }
 
         Prompt(
