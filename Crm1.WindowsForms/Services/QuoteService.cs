@@ -69,6 +69,18 @@ public sealed class QuoteService
             };
         }
 
+        // La fecha no puede ser anterior a hoy (decisión del usuario, 18/11):
+        // al guardar salta el mensaje y la celda queda marcada; los registros
+        // históricos sin cambios se reescriben tal cual (specs/009 §5).
+        if (quote.QuoteDate.Date < DateTime.Today)
+        {
+            return new QuoteValidationError
+            {
+                Field = nameof(Quote.QuoteDate),
+                Message = "La fecha no puede ser anterior a hoy."
+            };
+        }
+
         if (quote.Amount <= 0)
         {
             return new QuoteValidationError

@@ -69,6 +69,18 @@ public sealed class OrderService
             };
         }
 
+        // La fecha no puede ser anterior a hoy (decisión del usuario, 18/11):
+        // al guardar salta el mensaje y la celda queda marcada; los registros
+        // históricos sin cambios se reescriben tal cual (specs/009 §5).
+        if (order.OrderDate.Date < DateTime.Today)
+        {
+            return new OrderValidationError
+            {
+                Field = nameof(Order.OrderDate),
+                Message = "La fecha no puede ser anterior a hoy."
+            };
+        }
+
         if (order.Amount <= 0)
         {
             return new OrderValidationError

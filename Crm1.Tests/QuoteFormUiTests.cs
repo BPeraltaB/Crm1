@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Crm1.WindowsForms.Forms;
 using Crm1.WindowsForms.Models;
 using Xunit;
@@ -17,6 +17,12 @@ public sealed class QuoteFormUiTests
     {
         UiTestEnvironment.EnsureCatalog();
     }
+
+    // Fechas relativas a hoy para los flujos que guardan o aceptan: la fecha
+    // no puede ser anterior a hoy (specs/009 §5).
+    private static DateTime Tomorrow => DateTime.Today.AddDays(1);
+    private static string TomorrowText => Tomorrow.ToString("dd/MM/yyyy");
+    private static string YesterdayText => DateTime.Today.AddDays(-1).ToString("dd/MM/yyyy");
 
     private static Quote QuoteOf(Guid relatedId, DateTime date,
         TaskRelatedType relatedType = TaskRelatedType.Client,
@@ -98,7 +104,7 @@ public sealed class QuoteFormUiTests
     public void Accept_quote_of_a_client_creates_the_order_on_save()
     {
         Client ana = Fixtures.Client("Ana", "12345678Z");
-        Quote quote = QuoteOf(ana.Id, new DateTime(2026, 11, 15));
+        Quote quote = QuoteOf(ana.Id, Tomorrow);
         UiTestEnvironment.WriteClients(ana);
         UiTestEnvironment.WriteContacts();
         UiTestEnvironment.WriteQuotes(quote);
@@ -128,7 +134,7 @@ public sealed class QuoteFormUiTests
             Order order = Assert.Single(UiTestEnvironment.ReadOrders());
             Assert.Equal(ana.Id, order.ClientId);
             Assert.Equal(OrderKind.Order, order.Kind);
-            Assert.Equal(new DateTime(2026, 11, 15), order.OrderDate);
+            Assert.Equal(Tomorrow, order.OrderDate);
             Assert.Equal(1200.56m, order.Amount);
             Assert.Equal("P-2026-0142", order.Reference);
             Assert.Equal("Mobiliario de oficina", order.Description);
@@ -144,7 +150,7 @@ public sealed class QuoteFormUiTests
     public void Accept_quote_of_a_prospect_converts_it_and_creates_the_order()
     {
         Contact convertible = Fixtures.ConvertibleContact();
-        Quote quote = QuoteOf(convertible.Id, new DateTime(2026, 11, 15), TaskRelatedType.Prospect);
+        Quote quote = QuoteOf(convertible.Id, Tomorrow, TaskRelatedType.Prospect);
         Client other = Fixtures.Client("Luis", "23456781R");
         var prospectTask = Fixtures.Task(convertible.Id, TaskRelatedType.Prospect);
         UiTestEnvironment.WriteClients(other);
@@ -197,7 +203,7 @@ public sealed class QuoteFormUiTests
     public void Accept_quote_of_a_prospect_without_conversion_leaves_it_accepted_without_order()
     {
         Contact convertible = Fixtures.ConvertibleContact();
-        Quote quote = QuoteOf(convertible.Id, new DateTime(2026, 11, 15), TaskRelatedType.Prospect);
+        Quote quote = QuoteOf(convertible.Id, Tomorrow, TaskRelatedType.Prospect);
         UiTestEnvironment.WriteClients(Fixtures.Client("Luis", "23456781R"));
         UiTestEnvironment.WriteContacts(convertible);
         UiTestEnvironment.WriteQuotes(quote);
@@ -228,7 +234,7 @@ public sealed class QuoteFormUiTests
     {
         // Futuro cliente mínimo: le faltan los datos que Clientes exige.
         Contact incomplete = Fixtures.Contact("Elena");
-        Quote quote = QuoteOf(incomplete.Id, new DateTime(2026, 11, 15), TaskRelatedType.Prospect);
+        Quote quote = QuoteOf(incomplete.Id, Tomorrow, TaskRelatedType.Prospect);
         UiTestEnvironment.WriteClients(Fixtures.Client("Luis", "23456781R"));
         UiTestEnvironment.WriteContacts(incomplete);
         UiTestEnvironment.WriteQuotes(quote);
@@ -255,7 +261,7 @@ public sealed class QuoteFormUiTests
     public void Accepted_quote_without_order_offers_create_order()
     {
         Client ana = Fixtures.Client("Ana", "12345678Z");
-        Quote quote = QuoteOf(ana.Id, new DateTime(2026, 11, 15), status: QuoteStatus.Accepted);
+        Quote quote = QuoteOf(ana.Id, Tomorrow, status: QuoteStatus.Accepted);
         UiTestEnvironment.WriteClients(ana);
         UiTestEnvironment.WriteContacts();
         UiTestEnvironment.WriteQuotes(quote);
@@ -284,7 +290,7 @@ public sealed class QuoteFormUiTests
     public void Cancel_without_edition_undoes_the_pending_acceptance()
     {
         Client ana = Fixtures.Client("Ana", "12345678Z");
-        Quote quote = QuoteOf(ana.Id, new DateTime(2026, 11, 15));
+        Quote quote = QuoteOf(ana.Id, Tomorrow);
         UiTestEnvironment.WriteClients(ana);
         UiTestEnvironment.WriteContacts();
         UiTestEnvironment.WriteQuotes(quote);
@@ -330,7 +336,7 @@ public sealed class QuoteFormUiTests
             DataGridView grid = FormAccess.Grid(form, "quotesDataGridView");
 
             FormAccess.Click(form, "NewButton_Click");
-            grid.Rows[0].Cells["quoteDateColumn"].Value = "10/11/2026";
+            grid.Rows[0].Cells["quoteDateColumn"].Value = TomorrowText;
             grid.Rows[0].Cells["amountColumn"].Value = "1.234,56";
             grid.Rows[0].Cells["referenceColumn"].Value = "P-2026-0200";
             grid.Rows[0].Cells["descriptionColumn"].Value = "Sillas ergonómicas";
@@ -339,7 +345,7 @@ public sealed class QuoteFormUiTests
             FormAccess.Click(form, "SaveButton_Click");
 
             Quote saved = Assert.Single(UiTestEnvironment.ReadQuotes());
-            Assert.Equal(new DateTime(2026, 11, 10), saved.QuoteDate);
+            Assert.Equal(Tomorrow, saved.QuoteDate);
             Assert.Equal(1234.56m, saved.Amount);
             Assert.Equal("P-2026-0200", saved.Reference);
             Assert.Equal("Sillas ergonómicas", saved.Description);
@@ -352,7 +358,7 @@ public sealed class QuoteFormUiTests
     public void Modify_then_cancel_restores_and_save_persists_the_change()
     {
         Client ana = Fixtures.Client("Ana", "12345678Z");
-        Quote quote = QuoteOf(ana.Id, new DateTime(2026, 11, 15));
+        Quote quote = QuoteOf(ana.Id, Tomorrow);
         UiTestEnvironment.WriteClients(ana);
         UiTestEnvironment.WriteContacts();
         UiTestEnvironment.WriteQuotes(quote);
@@ -381,11 +387,76 @@ public sealed class QuoteFormUiTests
     }
 
     [Fact]
-    public void ShowQuotesOf_filters_the_view_and_saving_keeps_hidden_quotes()
+    public void Saving_with_a_past_date_shows_the_message_and_keeping_the_edit()
     {
         Client ana = Fixtures.Client("Ana", "12345678Z");
+        UiTestEnvironment.WriteClients(ana);
+        UiTestEnvironment.WriteContacts();
+        UiTestEnvironment.WriteQuotes();
+        UiTestEnvironment.WriteOrders();
+
+        WinFormsSta.Run(() =>
+        {
+            var recorder = new PromptRecorder(DialogResult.OK, DialogResult.OK);
+            using var form = new QuoteForm(recorder.Answer);
+            DataGridView grid = FormAccess.Grid(form, "quotesDataGridView");
+
+            FormAccess.Click(form, "NewButton_Click");
+            grid.Rows[0].Cells["quoteDateColumn"].Value = YesterdayText;
+            grid.Rows[0].Cells["amountColumn"].Value = "1.000,50";
+            grid.Rows[0].Cells["relatedColumn"].Value = "(Cliente) Ana García Pérez";
+
+            FormAccess.Click(form, "SaveButton_Click");
+
+            // Mensaje claro, celda marcada, edición abierta y nada escrito.
+            Assert.Single(recorder.Messages);
+            Assert.Equal("La fecha no puede ser anterior a hoy.", recorder.Messages[0]);
+            Assert.True(form.IsEditing);
+            Assert.True(form.HasUnsavedChanges);
+            Assert.Empty(UiTestEnvironment.ReadQuotes());
+
+            // Al corregir la fecha, guarda con normalidad.
+            grid.Rows[0].Cells["quoteDateColumn"].Value = TomorrowText;
+            FormAccess.Click(form, "SaveButton_Click");
+
+            Quote saved = Assert.Single(UiTestEnvironment.ReadQuotes());
+            Assert.Equal(Tomorrow, saved.QuoteDate);
+            Assert.False(form.IsEditing);
+        });
+    }
+
+    [Fact]
+    public void Saving_keeps_unchanged_historical_rows_without_revalidating_their_date()
+    {
+        // Historial legítimo con fecha pasada: guardar sin tocarlo lo conserva.
+        Client ana = Fixtures.Client("Ana", "12345678Z");
+        Quote historical = QuoteOf(ana.Id, new DateTime(2025, 12, 20));
+        UiTestEnvironment.WriteClients(ana);
+        UiTestEnvironment.WriteContacts();
+        UiTestEnvironment.WriteQuotes(historical);
+        UiTestEnvironment.WriteOrders();
+
+        WinFormsSta.Run(() =>
+        {
+            var recorder = new PromptRecorder(DialogResult.OK);
+            using var form = new QuoteForm(recorder.Answer);
+            DataGridView grid = FormAccess.Grid(form, "quotesDataGridView");
+            Assert.Equal("20/12/2025", FormAccess.CellText(grid.Rows[0], "quoteDateColumn"));
+
+            FormAccess.Click(form, "SaveButton_Click");
+
+            Assert.Contains("1 presupuesto(s)", recorder.Messages[0]);
+            Quote saved = Assert.Single(UiTestEnvironment.ReadQuotes());
+            Assert.Equal(new DateTime(2025, 12, 20), saved.QuoteDate);
+            Assert.False(form.HasUnsavedChanges);
+        });
+    }
+
+    [Fact]
+    public void ShowQuotesOf_filters_the_view_and_saving_keeps_hidden_quotes()    {
+        Client ana = Fixtures.Client("Ana", "12345678Z");
         Client luis = Fixtures.Client("Luis", "23456781R");
-        Quote anaQuote = QuoteOf(ana.Id, new DateTime(2026, 11, 15));
+        Quote anaQuote = QuoteOf(ana.Id, Tomorrow);
         Quote luisQuote = QuoteOf(luis.Id, new DateTime(2026, 11, 10));
         UiTestEnvironment.WriteClients(ana, luis);
         UiTestEnvironment.WriteContacts();

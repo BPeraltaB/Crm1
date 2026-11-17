@@ -17,6 +17,11 @@ public sealed class OrderFormUiTests
         UiTestEnvironment.EnsureCatalog();
     }
 
+    // Fechas relativas a hoy: la fecha no puede ser anterior a hoy (specs/009 §5).
+    private static DateTime Tomorrow => DateTime.Today.AddDays(1);
+    private static string TomorrowText => Tomorrow.ToString("dd/MM/yyyy");
+    private static string YesterdayText => DateTime.Today.AddDays(-1).ToString("dd/MM/yyyy");
+
     private static Order OrderOf(Guid clientId, DateTime date,
         OrderKind kind = OrderKind.Order, decimal amount = 1000m,
         string description = "Mobiliario de oficina") => new()
@@ -98,7 +103,7 @@ public sealed class OrderFormUiTests
 
             FormAccess.Click(form, "NewButton_Click");
             Assert.Equal("Pedido", FormAccess.CellText(grid.Rows[0], "kindColumn"));
-            grid.Rows[0].Cells["orderDateColumn"].Value = "12/11/2026";
+            grid.Rows[0].Cells["orderDateColumn"].Value = TomorrowText;
             grid.Rows[0].Cells["amountColumn"].Value = "980,75";
             grid.Rows[0].Cells["clientColumn"].Value = "(Cliente) Ana García Pérez";
 
@@ -106,7 +111,7 @@ public sealed class OrderFormUiTests
 
             Order saved = Assert.Single(UiTestEnvironment.ReadOrders());
             Assert.Equal(OrderKind.Order, saved.Kind);
-            Assert.Equal(new DateTime(2026, 11, 12), saved.OrderDate);
+            Assert.Equal(Tomorrow, saved.OrderDate);
             Assert.Equal(980.75m, saved.Amount);
             Assert.Equal(ana.Id, saved.ClientId);
         });
@@ -130,7 +135,7 @@ public sealed class OrderFormUiTests
 
             FormAccess.Click(form, "NewButton_Click");
             grid.Rows[0].Cells["kindColumn"].Value = "Abono";
-            grid.Rows[0].Cells["orderDateColumn"].Value = "16/11/2026";
+            grid.Rows[0].Cells["orderDateColumn"].Value = TomorrowText;
             grid.Rows[0].Cells["amountColumn"].Value = "150";
             grid.Rows[0].Cells["clientColumn"].Value = "(Cliente) Ana García Pérez";
 
@@ -158,7 +163,7 @@ public sealed class OrderFormUiTests
             DataGridView grid = FormAccess.Grid(form, "ordersDataGridView");
 
             FormAccess.Click(form, "NewButton_Click");
-            grid.Rows[0].Cells["orderDateColumn"].Value = "12/11/2026";
+            grid.Rows[0].Cells["orderDateColumn"].Value = TomorrowText;
             grid.Rows[0].Cells["amountColumn"].Value = "12,3,4";
             grid.Rows[0].Cells["clientColumn"].Value = "(Cliente) Ana García Pérez";
 
@@ -201,6 +206,40 @@ public sealed class OrderFormUiTests
 
             form.ShowAllOrders();
             Assert.Equal(2, grid.Rows.Count);
+        });
+    }
+
+    [Fact]
+    public void Saving_with_a_past_date_shows_the_message_and_keeping_the_edit()
+    {
+        Client ana = Fixtures.Client("Ana", "12345678Z");
+        UiTestEnvironment.WriteClients(ana);
+        UiTestEnvironment.WriteContacts();
+        UiTestEnvironment.WriteOrders();
+
+        WinFormsSta.Run(() =>
+        {
+            var recorder = new PromptRecorder(DialogResult.OK, DialogResult.OK);
+            using var form = new OrderForm(recorder.Answer);
+            DataGridView grid = FormAccess.Grid(form, "ordersDataGridView");
+
+            FormAccess.Click(form, "NewButton_Click");
+            grid.Rows[0].Cells["orderDateColumn"].Value = YesterdayText;
+            grid.Rows[0].Cells["amountColumn"].Value = "500";
+            grid.Rows[0].Cells["clientColumn"].Value = "(Cliente) Ana García Pérez";
+
+            FormAccess.Click(form, "SaveButton_Click");
+
+            Assert.Single(recorder.Messages);
+            Assert.Equal("La fecha no puede ser anterior a hoy.", recorder.Messages[0]);
+            Assert.True(form.IsEditing);
+            Assert.Empty(UiTestEnvironment.ReadOrders());
+
+            grid.Rows[0].Cells["orderDateColumn"].Value = TomorrowText;
+            FormAccess.Click(form, "SaveButton_Click");
+
+            Assert.Single(UiTestEnvironment.ReadOrders());
+            Assert.False(form.IsEditing);
         });
     }
 

@@ -724,6 +724,13 @@ public partial class OrderForm : System.Windows.Forms.Form
         var errors = new List<(int Row, OrderValidationError Error)>();
         var orders = new List<Order>();
         var rowIndexes = new List<int>();
+        var changedOrders = new List<Order>();
+        var changedRowIndexes = new List<int>();
+
+        // Copia guardada por Id: una fila idéntica a lo guardado es historial
+        // que se reescribe tal cual — su fecha anterior a hoy sigue siendo
+        // válida como historial (specs/009 §5); solo se validan los cambios.
+        var savedById = _savedOrders.ToDictionary(saved => saved.Id);
 
         for (int i = 0; i < ordersDataGridView.Rows.Count; i++)
         {
@@ -748,12 +755,22 @@ public partial class OrderForm : System.Windows.Forms.Form
 
             orders.Add(order);
             rowIndexes.Add(i);
+            if (!(order.Id != Guid.Empty && savedById.TryGetValue(order.Id, out Order? saved) && OrdersEqual(order, saved)))
+            {
+                changedOrders.Add(order);
+                changedRowIndexes.Add(i);
+            }
         }
 
-        // Reglas de negocio fuera del formulario (constitución, punto 3).
-        foreach (OrderRowValidationError rowError in _orderService!.ValidateOrders(orders))
+        // Reglas de negocio fuera del formulario (constitución, punto 3),
+        // aplicadas a las filas nuevas o modificadas.
+        for (int i = 0; i < changedOrders.Count; i++)
         {
-            errors.Add((rowIndexes[rowError.RowIndex], rowError.Error));
+            OrderValidationError? error = _orderService!.Validate(changedOrders[i]);
+            if (error is not null)
+            {
+                errors.Add((changedRowIndexes[i], error));
+            }
         }
 
         if (errors.Count > 0)

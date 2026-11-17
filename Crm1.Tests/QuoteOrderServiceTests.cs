@@ -38,7 +38,7 @@ public sealed class QuoteOrderServiceTests
     {
         var quote = new Quote
         {
-            QuoteDate = new DateTime(2026, 11, 10),
+            QuoteDate = DateTime.Today,
             Amount = 1200.56m,
             RelatedId = _client.Id,
             RelatedType = TaskRelatedType.Client
@@ -52,7 +52,7 @@ public sealed class QuoteOrderServiceTests
         var order = new Order
         {
             Kind = OrderKind.Order,
-            OrderDate = new DateTime(2026, 11, 12),
+            OrderDate = DateTime.Today,
             Amount = 1200.56m,
             ClientId = _client.Id
         };
@@ -67,6 +67,21 @@ public sealed class QuoteOrderServiceTests
     {
         QuoteValidationError? error = NewQuoteService().Validate(ValidQuote(q => q.QuoteDate = default));
         Assert.Equal(nameof(Quote.QuoteDate), error!.Field);
+    }
+
+    [Fact]
+    public void Quote_with_a_date_before_today_is_rejected_with_a_message()
+    {
+        QuoteValidationError? error = NewQuoteService().Validate(ValidQuote(q => q.QuoteDate = DateTime.Today.AddDays(-1)));
+        Assert.Equal(nameof(Quote.QuoteDate), error!.Field);
+        Assert.Equal("La fecha no puede ser anterior a hoy.", error.Message);
+    }
+
+    [Fact]
+    public void Quote_with_today_or_a_future_date_is_valid()
+    {
+        Assert.Null(NewQuoteService().Validate(ValidQuote(q => q.QuoteDate = DateTime.Today)));
+        Assert.Null(NewQuoteService().Validate(ValidQuote(q => q.QuoteDate = DateTime.Today.AddMonths(2))));
     }
 
     [Theory]
@@ -113,6 +128,18 @@ public sealed class QuoteOrderServiceTests
             NewOrderService().Validate(ValidOrder(o => o.OrderDate = default))!.Field);
         Assert.Equal(nameof(Order.Amount),
             NewOrderService().Validate(ValidOrder(o => o.Amount = 0))!.Field);
+    }
+
+    [Fact]
+    public void Order_with_a_date_before_today_is_rejected_with_a_message()
+    {
+        OrderValidationError? error = NewOrderService().Validate(ValidOrder(o =>
+        {
+            o.OrderDate = DateTime.Today.AddDays(-3);
+            o.Kind = OrderKind.CreditNote;
+        }));
+        Assert.Equal(nameof(Order.OrderDate), error!.Field);
+        Assert.Equal("La fecha no puede ser anterior a hoy.", error.Message);
     }
 
     [Fact]

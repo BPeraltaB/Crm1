@@ -78,7 +78,7 @@
 
 ## 5. Reglas de negocio (QuoteService / OrderService)
 
-- **Fecha obligatoria** y válida en dd/MM/aaaa («La celda está vacía.» / «La fecha no es válida (dd/mm/aaaa).»).
+- **Fecha obligatoria**, válida en dd/MM/aaaa y **nunca anterior a hoy** (decisión del usuario, 18/11/2026): al Guardar una fila nueva o modificada con fecha pasada salta el mensaje «La fecha no puede ser anterior a hoy.», la celda queda marcada con borde rojo y la edición sigue abierta. Los registros históricos guardados **sin cambios** se reescriben tal cual sin revalidar su fecha: el historial previo a la regla permanece (y sigue alimentando los totales por año) («La celda está vacía.» / «La fecha no es válida (dd/mm/aaaa).» / «La fecha no puede ser anterior a hoy.»). **Aceptar** también respeta la regla: un presupuesto con fecha pasada no se acepta hasta corregirla, así el pedido heredado nace siempre con fecha válida.
 - **Precio obligatorio**, en formato español — se admite coma o punto como decimal y puntos de miles con coma («1.234,56», «1234,56», «1234.56») — y **mayor que cero** («La celda está vacía.» / «El precio no es válido (usa el formato 1234,56).» / «El precio debe ser mayor que cero.»).
 - **Estado / Tipo** pertenecientes a sus desplegables («El estado no es válido.» / «El tipo no es válido.»).
 - **Vínculo obligatorio**: presupuesto → cliente o futuro existente y del tipo correcto; pedido/abono → **cliente existente** («Debes elegir un cliente o futuro cliente.» / «Debes elegir un cliente.»).

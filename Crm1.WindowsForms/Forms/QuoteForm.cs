@@ -792,6 +792,7 @@ public partial class QuoteForm : System.Windows.Forms.Form
         }
 
         Quote quote = MapRowToQuote(row, out QuoteValidationError? error);
+        error ??= _quoteService!.Validate(quote);
         if (error is not null)
         {
             Prompt(
@@ -1127,6 +1128,13 @@ public partial class QuoteForm : System.Windows.Forms.Form
         var errors = new List<(int Row, QuoteValidationError Error)>();
         var quotes = new List<Quote>();
         var rowIndexes = new List<int>();
+        var changedQuotes = new List<Quote>();
+        var changedRowIndexes = new List<int>();
+
+        // Copia guardada por Id: una fila idéntica a lo guardado es historial
+        // que se reescribe tal cual — su fecha anterior a hoy sigue siendo
+        // válida como historial (specs/009 §5); solo se validan los cambios.
+        var savedById = _savedQuotes.ToDictionary(saved => saved.Id);
 
         for (int i = 0; i < quotesDataGridView.Rows.Count; i++)
         {
@@ -1151,12 +1159,22 @@ public partial class QuoteForm : System.Windows.Forms.Form
 
             quotes.Add(quote);
             rowIndexes.Add(i);
+            if (!(quote.Id != Guid.Empty && savedById.TryGetValue(quote.Id, out Quote? saved) && QuotesEqual(quote, saved)))
+            {
+                changedQuotes.Add(quote);
+                changedRowIndexes.Add(i);
+            }
         }
 
-        // Reglas de negocio fuera del formulario (constitución, punto 3).
-        foreach (QuoteRowValidationError rowError in _quoteService!.ValidateQuotes(quotes))
+        // Reglas de negocio fuera del formulario (constitución, punto 3),
+        // aplicadas a las filas nuevas o modificadas.
+        for (int i = 0; i < changedQuotes.Count; i++)
         {
-            errors.Add((rowIndexes[rowError.RowIndex], rowError.Error));
+            QuoteValidationError? error = _quoteService!.Validate(changedQuotes[i]);
+            if (error is not null)
+            {
+                errors.Add((changedRowIndexes[i], error));
+            }
         }
 
         if (errors.Count > 0)
