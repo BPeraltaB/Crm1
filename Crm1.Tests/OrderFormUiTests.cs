@@ -261,10 +261,10 @@ public sealed class OrderFormUiTests
             TextBox search = FormAccess.TextBox(form, "searchTextBox");
 
             // Por tipo: solo el abono, y los totales se recalculan con él
-            // (el neto negativo usa el signo menos del formato numérico).
+            // (el neto negativo lleva el mismo menos tipográfico que abonos).
             search.Text = "abono";
             Assert.Equal("Mostrando 1 de 2", FormAccess.Label(form, "counterLabel").Text);
-            Assert.StartsWith("0 pedido(s) — 0,00 € · 1 abono(s) — −150,00 € · Neto: -150,00 €",
+            Assert.StartsWith("0 pedido(s) — 0,00 € · 1 abono(s) — −150,00 € · Neto: −150,00 €",
                 FormAccess.Label(form, "totalsLabel").Text);
 
             // Por cliente: solo los movimientos de Ana.

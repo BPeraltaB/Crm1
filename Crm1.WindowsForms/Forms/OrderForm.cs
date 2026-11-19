@@ -438,13 +438,19 @@ public partial class OrderForm : System.Windows.Forms.Form
 
         (int orderCount, decimal orderTotal, int creditNoteCount, decimal creditNoteTotal, decimal net) =
             OrderService.Totals(visibleOrders);
+
+        // El neto negativo lleva el mismo menos tipográfico (−) que el total
+        // de abonos, para que ambos se lean igual en la barra.
+        string netText = net < 0
+            ? $"−{SpanishPrice.Format(-net)}"
+            : SpanishPrice.Format(net);
         totalsLabel.Text = allYears
             ? $"{orderCount} pedido(s) — {SpanishPrice.Format(orderTotal)} € · " +
                 $"{creditNoteCount} abono(s) — −{SpanishPrice.Format(creditNoteTotal)} € · " +
-                $"Neto: {SpanishPrice.Format(net)} €"
+                $"Neto: {netText} €"
             : $"{yearText}: {orderCount} pedido(s) — {SpanishPrice.Format(orderTotal)} € · " +
                 $"{creditNoteCount} abono(s) — −{SpanishPrice.Format(creditNoteTotal)} € · " +
-                $"Neto: {SpanishPrice.Format(net)} €";
+                $"Neto: {netText} €";
 
         // Si el movimiento actual quedó oculto por el filtro, la marca se
         // retira (volverá a marcarse con un clic cuando vuelva a verse).
