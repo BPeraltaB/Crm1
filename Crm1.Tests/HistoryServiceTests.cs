@@ -7,9 +7,10 @@ using TaskStatus = Crm1.WindowsForms.Models.TaskStatus;
 namespace Crm1.Tests;
 
 /// <summary>
-/// Pruebas de la agregación del historial (specs/010, sección 2): mezcla de
-/// tipos, orden cronológico inverso, alta condicionada a la fecha, textos de
-/// la interfaz y totales con el consumo neto.
+/// Pruebas de la agregación del historial (specs/010, sección 2): se
+/// detallan solo las tareas y recordatorios que faltan, el resto se resume
+/// por año (consumo, presupuestos, tareas completadas y recordatorios
+/// descartados), con los totales globales de la barra.
 /// </summary>
 public sealed class HistoryServiceTests
 {
@@ -90,48 +91,123 @@ public sealed class HistoryServiceTests
             activity.OfType<Order>());
 
     [Fact]
-    public void Client_history_mixes_all_kinds_newest_first()
+    public void Client_history_details_only_what_is_outstanding_and_summarizes_by_year()
+    {
+        Client ana = ClientOf(new DateTime(2025, 1, 15));
+        Guid id = ana.Id;
+
+        HistoryResult history = Build(ana, null,
+            // Detalladas: pendientes y activos, de cualquier año.
+            TaskOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 10), "Enviar correo", "propuesta reformada"),
+            ReminderOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 20, 10, 30, 0)),
+            // Resumidas: completadas y descartadas.
+            TaskOf(id, TaskRelatedType.Client, new DateTime(2026, 3, 5), status: TaskStatus.Completed),
+            ReminderOf(id, TaskRelatedType.Client, new DateTime(2025, 5, 2, 9, 0, 0), status: ReminderStatus.Dismissed),
+            // Presupuestos y movimientos de dos años.
+            QuoteOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 12), status: QuoteStatus.Accepted),
+            QuoteOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 13), status: QuoteStatus.Accepted),
+            QuoteOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 14), status: QuoteStatus.Dismissed),
+            QuoteOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 15)),
+            QuoteOf(id, TaskRelatedType.Client, new DateTime(2025, 2, 1), status: QuoteStatus.Accepted),
+            OrderOf(id, new DateTime(2026, 11, 12), amount: 1000m),
+            OrderOf(id, new DateTime(2026, 11, 20), amount: 500m),
+            OrderOf(id, new DateTime(2026, 11, 22), OrderKind.CreditNote, 150m),
+            OrderOf(id, new DateTime(2025, 6, 10), amount: 500m));
+
+        // Bloque 2026: consumo, presupuestos y tareas completadas; luego el
+        // detalle vivo; bloque 2025 igual; y el alta como línea más antigua.
+        Assert.Equal(new[]
+        {
+            HistoryEntryKind.ConsumptionSummary,   // 2026
+            HistoryEntryKind.QuoteSummary,        // 2026
+            HistoryEntryKind.TaskSummary,         // 2026
+            HistoryEntryKind.Reminder,            // 20/11/2026 10:30
+            HistoryEntryKind.Task,                // 10/11/2026
+            HistoryEntryKind.ConsumptionSummary,  // 2025
+            HistoryEntryKind.QuoteSummary,        // 2025
+            HistoryEntryKind.ReminderSummary,     // 2025
+            HistoryEntryKind.Registration         // 15/01/2025
+        }, history.Entries.Select(entry => entry.Kind).ToArray());
+
+        // Las líneas de resumen encabezan su año con el 31/12 a última hora.
+        Assert.Equal(new DateTime(2026, 12, 31, 23, 59, 59), history.Entries[0].Date);
+        Assert.Equal(new DateTime(2025, 12, 31, 23, 59, 59), history.Entries[5].Date);
+
+        Assert.Equal("Consumo 2026",
+            history.Entries[0].TypeText);
+        Assert.Equal("2 pedidos — 1.500,00 € · 1 abono — −150,00 € · Consumido: 1.350,00 €",
+            history.Entries[0].Detail);
+        Assert.Equal("Presupuestos 2026", history.Entries[1].TypeText);
+        Assert.Equal("4 — 2 aceptados · 1 descartado · 1 pendiente", history.Entries[1].Detail);
+        Assert.Equal("Tareas 2026", history.Entries[2].TypeText);
+        Assert.Equal("1 completada", history.Entries[2].Detail);
+
+        Assert.Equal("Recordatorio", history.Entries[3].TypeText);
+        Assert.Equal("Activo", history.Entries[3].StatusText);
+        Assert.Equal("Tarea", history.Entries[4].TypeText);
+        Assert.Equal("Enviar correo: propuesta reformada", history.Entries[4].Detail);
+        Assert.Equal("Pendiente", history.Entries[4].StatusText);
+
+        Assert.Equal("Consumo 2025", history.Entries[5].TypeText);
+        Assert.Equal("1 pedido — 500,00 € · Consumido: 500,00 €", history.Entries[5].Detail);
+        Assert.Equal("Presupuestos 2025", history.Entries[6].TypeText);
+        Assert.Equal("1 — 1 aceptado", history.Entries[6].Detail);
+        Assert.Equal("Recordatorios 2025", history.Entries[7].TypeText);
+        Assert.Equal("1 descartado", history.Entries[7].Detail);
+
+        Assert.Equal("Alta del cliente", history.Entries[8].TypeText);
+        Assert.Equal(string.Empty, history.Entries[8].Detail);
+        Assert.Equal(string.Empty, history.Entries[8].StatusText);
+    }
+
+    [Fact]
+    public void Summary_lines_carry_no_status_and_detail_rows_pluralize()
     {
         Client ana = ClientOf(new DateTime(2026, 1, 15));
         Guid id = ana.Id;
 
         HistoryResult history = Build(ana, null,
-            TaskOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 10)),
-            QuoteOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 12)),
-            OrderOf(id, new DateTime(2026, 11, 12)),
-            ReminderOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 20, 10, 30, 0)));
+            TaskOf(id, TaskRelatedType.Client, new DateTime(2026, 3, 1), status: TaskStatus.Completed),
+            TaskOf(id, TaskRelatedType.Client, new DateTime(2026, 3, 2), status: TaskStatus.Completed),
+            ReminderOf(id, TaskRelatedType.Client, new DateTime(2026, 3, 3), status: ReminderStatus.Dismissed),
+            ReminderOf(id, TaskRelatedType.Client, new DateTime(2026, 3, 4), status: ReminderStatus.Dismissed),
+            TaskOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 10), "Visitar"),
+            OrderOf(id, new DateTime(2026, 5, 5), OrderKind.CreditNote, 150m));
 
-        // Cinco líneas: alta + recordatorio + pedido + presupuesto + tarea.
-        Assert.Equal(5, history.Entries.Count);
-        Assert.Equal(HistoryEntryKind.Reminder, history.Entries[0].Kind);
-        Assert.Equal(HistoryEntryKind.Order, history.Entries[1].Kind);
-        Assert.Equal(HistoryEntryKind.Quote, history.Entries[2].Kind);
-        Assert.Equal(HistoryEntryKind.Task, history.Entries[3].Kind);
-        Assert.Equal(HistoryEntryKind.Registration, history.Entries[4].Kind);
+        Assert.Equal("2 completadas",
+            history.Entries.Single(entry => entry.Kind == HistoryEntryKind.TaskSummary).Detail);
+        Assert.Equal("2 descartados",
+            history.Entries.Single(entry => entry.Kind == HistoryEntryKind.ReminderSummary).Detail);
 
-        // La línea de alta no tiene detalle ni estado.
-        HistoryEntry alta = history.Entries[4];
-        Assert.Equal("Alta del cliente", alta.TypeText);
-        Assert.Equal(new DateTime(2026, 1, 15), alta.Date);
-        Assert.Equal(string.Empty, alta.Detail);
-        Assert.Equal(string.Empty, alta.StatusText);
+        // Con un año de solo abonos, el resumen no muestra «0 pedidos».
+        Assert.Equal("1 abono — −150,00 € · Consumido: −150,00 €",
+            history.Entries.Single(entry => entry.Kind == HistoryEntryKind.ConsumptionSummary).Detail);
+
+        // Sin estado en las líneas de resumen; la tarea sin descripción
+        // muestra solo su acción.
+        Assert.All(history.Entries.Where(entry => entry.Kind >= HistoryEntryKind.ReminderSummary),
+            entry => Assert.Equal(string.Empty, entry.StatusText));
+        HistoryEntry pending = history.Entries.Single(entry => entry.Kind == HistoryEntryKind.Task);
+        Assert.Equal("Visitar", pending.Detail);
+        Assert.Equal("Pendiente", pending.StatusText);
     }
 
     [Fact]
-    public void Same_day_puts_the_money_on_top()
+    public void In_progress_tasks_are_detailed_and_empty_years_put_no_line()
     {
-        Client ana = ClientOf(default);
+        Client ana = ClientOf(new DateTime(2025, 1, 15));
         Guid id = ana.Id;
 
         HistoryResult history = Build(ana, null,
-            TaskOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 12)),
-            QuoteOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 12)),
-            OrderOf(id, new DateTime(2026, 11, 12)),
-            OrderOf(id, new DateTime(2026, 11, 12), OrderKind.CreditNote));
+            TaskOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 10), status: TaskStatus.InProgress),
+            TaskOf(id, TaskRelatedType.Client, new DateTime(2025, 3, 5), status: TaskStatus.Completed));
 
-        Assert.Equal(
-            new[] { HistoryEntryKind.CreditNote, HistoryEntryKind.Order, HistoryEntryKind.Quote, HistoryEntryKind.Task },
-            history.Entries.Select(entry => entry.Kind).ToArray());
+        // 2026 no tiene resumen de nada: solo la tarea en curso detallada.
+        Assert.Equal(HistoryEntryKind.Task, history.Entries[0].Kind);
+        Assert.Equal("En curso", history.Entries[0].StatusText);
+        Assert.Equal(HistoryEntryKind.TaskSummary, history.Entries[1].Kind);
+        Assert.Equal("Tareas 2025", history.Entries[1].TypeText);
+        Assert.Equal(HistoryEntryKind.Registration, history.Entries[2].Kind);
     }
 
     [Fact]
@@ -156,12 +232,18 @@ public sealed class HistoryServiceTests
 
         HistoryResult history = Build(null, clara,
             TaskOf(id, TaskRelatedType.Prospect, new DateTime(2026, 11, 10)),
-            QuoteOf(id, TaskRelatedType.Prospect, new DateTime(2026, 11, 12)),
+            QuoteOf(id, TaskRelatedType.Prospect, new DateTime(2026, 11, 12), status: QuoteStatus.Accepted),
             // Pedidos de otro cliente: nunca en el historial de un futuro.
             OrderOf(otro.Id, new DateTime(2026, 11, 20)),
             OrderOf(otro.Id, new DateTime(2026, 11, 20), OrderKind.CreditNote));
 
-        Assert.Equal(3, history.Entries.Count);
+        // Presupuestos 2026, tarea detallada y alta del futuro; sin consumo.
+        Assert.Equal(new[]
+        {
+            HistoryEntryKind.QuoteSummary,
+            HistoryEntryKind.Task,
+            HistoryEntryKind.Registration
+        }, history.Entries.Select(entry => entry.Kind).ToArray());
         Assert.Equal("Alta del futuro cliente", history.Entries[2].TypeText);
 
         // Totales sin movimientos: un futuro no puede tener pedidos.
@@ -175,8 +257,8 @@ public sealed class HistoryServiceTests
     {
         Client ana = ClientOf(new DateTime(2026, 1, 15));
         Client luis = ClientOf(new DateTime(2026, 1, 15));
-        Contact clara = ProspectOf(default);
         luis.Id = Guid.NewGuid();
+        Contact clara = ProspectOf(default);
 
         HistoryResult history = Build(ana, null,
             TaskOf(luis.Id, TaskRelatedType.Client, new DateTime(2026, 11, 10)),
@@ -189,63 +271,6 @@ public sealed class HistoryServiceTests
         Assert.Equal(HistoryEntryKind.Registration, entry.Kind);
         Assert.Equal(0, history.Totals.QuoteCount);
         Assert.Equal(0, history.Totals.OrderCount);
-    }
-
-    [Fact]
-    public void Detail_and_status_texts_are_in_spanish()
-    {
-        Client ana = ClientOf(new DateTime(2026, 1, 15));
-        Guid id = ana.Id;
-
-        HistoryResult history = Build(ana, null,
-            QuoteOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 12),
-                1000m, "PRE-003", "Reforma cocina", QuoteStatus.Accepted),
-            TaskOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 10),
-                "Enviar correo", "propuesta reformada", TaskStatus.Completed),
-            ReminderOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 5),
-                "Llamar para presupuesto", ReminderStatus.Dismissed),
-            OrderOf(id, new DateTime(2026, 11, 20), OrderKind.CreditNote,
-                150m, "DEV-001", "Abono parcial"));
-
-        var byKind = history.Entries.ToDictionary(entry => entry.Kind);
-
-        Assert.Equal("1.000,00 € · PRE-003 · Reforma cocina", byKind[HistoryEntryKind.Quote].Detail);
-        Assert.Equal("Aceptado", byKind[HistoryEntryKind.Quote].StatusText);
-
-        Assert.Equal("Enviar correo: propuesta reformada", byKind[HistoryEntryKind.Task].Detail);
-        Assert.Equal("Completada", byKind[HistoryEntryKind.Task].StatusText);
-
-        Assert.Equal("Llamar para presupuesto", byKind[HistoryEntryKind.Reminder].Detail);
-        Assert.Equal("Descartado", byKind[HistoryEntryKind.Reminder].StatusText);
-
-        // El abono lleva el menos tipográfico «−» delante del precio.
-        Assert.Equal("−150,00 € · DEV-001 · Abono parcial", byKind[HistoryEntryKind.CreditNote].Detail);
-        Assert.Equal(string.Empty, byKind[HistoryEntryKind.CreditNote].StatusText);
-    }
-
-    [Fact]
-    public void Task_without_description_shows_only_the_action()
-    {
-        Client ana = ClientOf(new DateTime(2026, 1, 15));
-
-        HistoryResult history = Build(ana, null,
-            TaskOf(ana.Id, TaskRelatedType.Client, new DateTime(2026, 11, 10), "Visitar"));
-
-        Assert.Equal("Tarea", history.Entries[0].TypeText);
-        Assert.Equal("Visitar", history.Entries[0].Detail);
-    }
-
-    [Fact]
-    public void Quote_detail_skips_empty_reference_and_description()
-    {
-        Client ana = ClientOf(new DateTime(2026, 1, 15));
-
-        HistoryResult history = Build(ana, null,
-            QuoteOf(ana.Id, TaskRelatedType.Client, new DateTime(2026, 11, 10),
-                1000m, "", "", QuoteStatus.Dismissed));
-
-        Assert.Equal("1.000,00 €", history.Entries[0].Detail);
-        Assert.Equal("Descartado", history.Entries[0].StatusText);
     }
 
     [Fact]

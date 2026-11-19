@@ -4,30 +4,34 @@ using Task = Crm1.WindowsForms.Models.Task;
 namespace Crm1.WindowsForms.Services;
 
 /// <summary>
-/// Tipo de línea del historial (specs/010): el alta del registro, sus
-/// recordatorios, sus tareas, sus presupuestos y sus pedidos y abonos. El
-/// orden de los valores es también el de desempate cuando dos líneas caen el
-/// mismo día: el dinero queda arriba.
+/// Tipo de línea del historial (specs/010): el alta del registro, las tareas
+/// y recordatorios que siguen pendientes, y los resúmenes por año de lo que
+/// ya es historial (consumo, presupuestos, tareas completadas y recordatorios
+/// descartados). El orden de los valores es también el de desempate cuando
+/// dos líneas caen el mismo día: lo resumido y el dinero quedan arriba.
 /// </summary>
 public enum HistoryEntryKind
 {
     /// <summary>Alta del cliente o del futuro cliente.</summary>
     Registration = 0,
 
-    /// <summary>Recordatorio vinculado.</summary>
+    /// <summary>Recordatorio activo (todavía tiene que avisar).</summary>
     Reminder = 1,
 
-    /// <summary>Tarea vinculada.</summary>
+    /// <summary>Tarea pendiente o en curso.</summary>
     Task = 2,
 
-    /// <summary>Presupuesto vinculado.</summary>
-    Quote = 3,
+    /// <summary>Resumen anual de recordatorios descartados.</summary>
+    ReminderSummary = 3,
 
-    /// <summary>Pedido del cliente.</summary>
-    Order = 4,
+    /// <summary>Resumen anual de tareas completadas.</summary>
+    TaskSummary = 4,
 
-    /// <summary>Abono del cliente.</summary>
-    CreditNote = 5
+    /// <summary>Resumen anual de presupuestos por estado.</summary>
+    QuoteSummary = 5,
+
+    /// <summary>Resumen anual del consumo (pedidos, abonos y neto).</summary>
+    ConsumptionSummary = 6
 }
 
 /// <summary>
@@ -36,16 +40,18 @@ public enum HistoryEntryKind
 /// </summary>
 public sealed class HistoryEntry
 {
-    /// <summary>Fecha (y hora en los recordatorios) de la línea.</summary>
+    /// <summary>Fecha (y hora en los recordatorios) de la línea; las de
+    /// resumen anual llevan el 31/12 del año a las 23:59:59 para encabezar
+    /// su bloque, aunque se muestran solo con el año.</summary>
     public DateTime Date { get; init; }
 
     /// <summary>Tipo de la línea.</summary>
     public HistoryEntryKind Kind { get; init; }
 
-    /// <summary>Texto de la columna Tipo («Presupuesto», «Alta del cliente»…).</summary>
+    /// <summary>Texto de la columna Tipo («Presupuestos 2026», «Alta del cliente»…).</summary>
     public string TypeText { get; init; } = string.Empty;
 
-    /// <summary>Texto de la columna Detalle (precio · referencia · descripción…).</summary>
+    /// <summary>Texto de la columna Detalle (resumen del año, asunto…).</summary>
     public string Detail { get; init; } = string.Empty;
 
     /// <summary>Texto de la columna Estado; vacío cuando el tipo no lo tiene.</summary>
@@ -54,7 +60,8 @@ public sealed class HistoryEntry
 
 /// <summary>
 /// Totales del historial de un registro (specs/010 §1): el dinero de pedidos
-/// y abonos, el consumo neto y los presupuestos por estado.
+/// y abonos, el consumo neto y los presupuestos por estado, de toda su
+/// historia (la barra del formulario; los desgloses por año van en la tabla).
 /// </summary>
 public sealed class HistoryTotals
 {
@@ -99,24 +106,27 @@ public sealed class HistoryResult
     /// <summary>Líneas del historial, lo más reciente arriba.</summary>
     public List<HistoryEntry> Entries { get; init; } = new();
 
-    /// <summary>Totales para la barra del formulario.</summary>
+    /// <summary>Totales globales para la barra del formulario.</summary>
     public HistoryTotals Totals { get; init; } = new();
 }
 
 /// <summary>
 /// Agregación del historial de un registro (specs/010): junta tareas,
 /// recordatorios, presupuestos y pedidos/abonos del cliente o futuro cliente
-/// indicado en una sola lista cronológica y calcula sus totales. Servicio
-/// estático y puro (constitución, punto 3): recibe las listas ya cargadas y
-/// no toca la base de datos — nada nuevo que guardar.
+/// indicado. Se detallan solo las tareas y recordatorios que faltan (decision
+/// del usuario, 19/11): el resto se resume por año — consumo, presupuestos
+/// por estado, tareas completadas y recordatorios descartados — con una
+/// línea por año a la cabeza de cada bloque. Servicio estático y puro
+/// (constitución, punto 3): recibe las listas ya cargadas y no toca la base
+/// de datos — nada nuevo que guardar.
 /// </summary>
 public static class HistoryService
 {
     /// <summary>
     /// Construye el historial del registro indicado: exactamente uno de
     /// cliente o futuro cliente no nulo (el otro, null). Devuelve las líneas
-    /// ordenadas por fecha descendente (empate: el dinero arriba) y los
-    /// totales de presupuestos y movimientos.
+    /// ordenadas por fecha descendente (empate: lo resumido y el dinero
+    /// arriba) y los totales globales.
     /// </summary>
     public static HistoryResult Build(Client? client, Contact? contact,
         IEnumerable<Task> tasks, IEnumerable<Reminder> reminders,
@@ -142,10 +152,19 @@ public static class HistoryService
             });
         }
 
+        // Recordatorios: los Activos se detallan (aunque estén vencidos:
+        // siguen faltando); los Descartados se cuentan por año.
+        var dismissedRemindersByYear = new Dictionary<int, int>();
         foreach (Reminder reminder in reminders)
         {
             if (reminder.RelatedId != relatedId || reminder.RelatedType != relatedType)
             {
+                continue;
+            }
+
+            if (reminder.Status == ReminderStatus.Dismissed)
+            {
+                CountByYear(dismissedRemindersByYear, reminder.RemindAt.Year);
                 continue;
             }
 
@@ -155,14 +174,23 @@ public static class HistoryService
                 Kind = HistoryEntryKind.Reminder,
                 TypeText = "Recordatorio",
                 Detail = reminder.Subject,
-                StatusText = reminder.Status == ReminderStatus.Dismissed ? "Descartado" : "Activo"
+                StatusText = "Activo"
             });
         }
 
+        // Tareas: las Pendientes y En curso se detallan; las Completadas se
+        // cuentan por año.
+        var completedTasksByYear = new Dictionary<int, int>();
         foreach (Task task in tasks)
         {
             if (task.RelatedId != relatedId || task.RelatedType != relatedType)
             {
+                continue;
+            }
+
+            if (task.Status == Models.TaskStatus.Completed)
+            {
+                CountByYear(completedTasksByYear, task.DueDate.Year);
                 continue;
             }
 
@@ -172,10 +200,13 @@ public static class HistoryService
                 Kind = HistoryEntryKind.Task,
                 TypeText = "Tarea",
                 Detail = task.Description.Length > 0 ? $"{task.Action}: {task.Description}" : task.Action,
-                StatusText = TaskStatusText(task.Status)
+                StatusText = task.Status == Models.TaskStatus.InProgress ? "En curso" : "Pendiente"
             });
         }
 
+        // Presupuestos: todos a su resumen anual por estado (aceptados,
+        // descartados y pendientes; las partes a cero no se muestran).
+        var quotesByYear = new Dictionary<int, (int Accepted, int Dismissed, int Pending)>();
         foreach (Quote quote in quotes)
         {
             if (quote.RelatedId != relatedId || quote.RelatedType != relatedType)
@@ -183,24 +214,25 @@ public static class HistoryService
                 continue;
             }
 
-            entries.Add(new HistoryEntry
+            (int accepted, int dismissed, int pending) = quotesByYear.GetValueOrDefault(quote.QuoteDate.Year);
+            if (quote.Status == QuoteStatus.Accepted)
             {
-                Date = quote.QuoteDate,
-                Kind = HistoryEntryKind.Quote,
-                TypeText = "Presupuesto",
-                Detail = QuoteDetail(quote),
-                StatusText = quote.Status switch
-                {
-                    QuoteStatus.Accepted => "Aceptado",
-                    QuoteStatus.Dismissed => "Descartado",
-                    _ => "Pendiente"
-                }
-            });
+                accepted++;
+            }
+            else if (quote.Status == QuoteStatus.Dismissed)
+            {
+                dismissed++;
+            }
+            else
+            {
+                pending++;
+            }
+            quotesByYear[quote.QuoteDate.Year] = (accepted, dismissed, pending);
         }
 
         // Pedidos y abonos: solo de clientes (un futuro con pedido ya sería
-        // cliente, specs/009); se filtran por ClientId y nunca aparecen en
-        // el historial de un futuro.
+        // cliente, specs/009); se agrupan por año para el resumen de consumo.
+        var ordersByYear = new Dictionary<int, List<Order>>();
         if (client is not null)
         {
             foreach (Order order in orders)
@@ -210,23 +242,63 @@ public static class HistoryService
                     continue;
                 }
 
-                bool isCreditNote = order.Kind == OrderKind.CreditNote;
-                entries.Add(new HistoryEntry
+                if (!ordersByYear.TryGetValue(order.OrderDate.Year, out List<Order>? yearOrders))
                 {
-                    Date = order.OrderDate,
-                    Kind = isCreditNote ? HistoryEntryKind.CreditNote : HistoryEntryKind.Order,
-                    TypeText = isCreditNote ? "Abono" : "Pedido",
-                    // El abono lleva el menos tipográfico «−», como en Pedidos.
-                    Detail = (isCreditNote
-                        ? $"−{SpanishPrice.Format(order.Amount)} €"
-                        : $"{SpanishPrice.Format(order.Amount)} €")
-                        + JoinOptional(order.Reference, order.Description)
-                });
+                    yearOrders = new List<Order>();
+                    ordersByYear[order.OrderDate.Year] = yearOrders;
+                }
+                yearOrders.Add(order);
             }
         }
 
-        // Lo más reciente arriba; el mismo día, el dinero arriba (el orden
-        // del enum es el de desempate).
+        // Líneas de resumen anual: encabezan su bloque con el 31/12 a última
+        // hora (se muestran solo con el año) — consumo, presupuestos, tareas
+        // completadas y recordatorios descartados, solo los años con contenido.
+        foreach ((int year, List<Order> yearOrders) in ordersByYear)
+        {
+            (int orderCount, decimal orderTotal, int creditNoteCount, decimal creditNoteTotal, decimal net) =
+                OrderService.Totals(yearOrders);
+            entries.Add(new HistoryEntry
+            {
+                Date = EndOfYear(year),
+                Kind = HistoryEntryKind.ConsumptionSummary,
+                TypeText = $"Consumo {year}",
+                Detail = ConsumptionText(orderCount, orderTotal, creditNoteCount, creditNoteTotal, net)
+            });
+        }
+        foreach ((int year, (int accepted, int dismissed, int pending)) in quotesByYear)
+        {
+            entries.Add(new HistoryEntry
+            {
+                Date = EndOfYear(year),
+                Kind = HistoryEntryKind.QuoteSummary,
+                TypeText = $"Presupuestos {year}",
+                Detail = QuoteSummaryText(accepted + dismissed + pending, accepted, dismissed, pending)
+            });
+        }
+        foreach ((int year, int completed) in completedTasksByYear)
+        {
+            entries.Add(new HistoryEntry
+            {
+                Date = EndOfYear(year),
+                Kind = HistoryEntryKind.TaskSummary,
+                TypeText = $"Tareas {year}",
+                Detail = $"{completed} {(completed == 1 ? "completada" : "completadas")}"
+            });
+        }
+        foreach ((int year, int dismissed) in dismissedRemindersByYear)
+        {
+            entries.Add(new HistoryEntry
+            {
+                Date = EndOfYear(year),
+                Kind = HistoryEntryKind.ReminderSummary,
+                TypeText = $"Recordatorios {year}",
+                Detail = $"{dismissed} {(dismissed == 1 ? "descartado" : "descartados")}"
+            });
+        }
+
+        // Lo más reciente arriba; el mismo día, lo resumido y el dinero
+        // arriba (el orden del enum es el de desempate).
         entries.Sort((a, b) =>
         {
             int byDate = b.Date.CompareTo(a.Date);
@@ -240,8 +312,9 @@ public static class HistoryService
         };
     }
 
-    // Totales de presupuestos (por estado) y de movimientos; el neto reutiliza
-    // OrderService.Totals (specs/009 §4.2) para no duplicar la aritmética.
+    // Totales globales de presupuestos (por estado) y de movimientos; el
+    // neto reutiliza OrderService.Totals (specs/009 §4.2) para no duplicar
+    // la aritmética.
     private static HistoryTotals BuildTotals(TaskRelatedType relatedType, Guid relatedId,
         IEnumerable<Quote> quotes, IEnumerable<Order> orders)
     {
@@ -289,26 +362,59 @@ public static class HistoryService
         };
     }
 
-    // Detalle de un presupuesto: «precio · referencia · descripción» en
-    // formato español, saltando los vacíos.
-    private static string QuoteDetail(Quote quote) =>
-        $"{SpanishPrice.Format(quote.Amount)} €"
-        + JoinOptional(quote.Reference, quote.Description);
-
-    // Sufijo « · referencia · descripción» con solo los fragmentos rellenos.
-    private static string JoinOptional(string reference, string description)
+    // Detalle del resumen anual de consumo: «2 pedidos — 1.000,00 € ·
+    // 1 abono — −150,00 € · Consumido: 850,00 €», sin las partes a cero.
+    private static string ConsumptionText(int orderCount, decimal orderTotal,
+        int creditNoteCount, decimal creditNoteTotal, decimal net)
     {
-        var parts = new[] { reference, description }
-            .Where(part => part.Length > 0);
-        string joined = string.Join(" · ", parts);
-        return joined.Length > 0 ? $" · {joined}" : string.Empty;
+        var parts = new List<string>();
+        if (orderCount > 0)
+        {
+            parts.Add($"{orderCount} {(orderCount == 1 ? "pedido" : "pedidos")} — {SpanishPrice.Format(orderTotal)} €");
+        }
+        if (creditNoteCount > 0)
+        {
+            parts.Add($"{creditNoteCount} {(creditNoteCount == 1 ? "abono" : "abonos")} — −{SpanishPrice.Format(creditNoteTotal)} €");
+        }
+        parts.Add($"Consumido: {FormatNet(net)} €");
+        return string.Join(" · ", parts);
     }
 
-    // Etiqueta en español del estado de una tarea (specs/005).
-    private static string TaskStatusText(Models.TaskStatus status) => status switch
+    // Detalle del resumen anual de presupuestos: «4 — 2 aceptados ·
+    // 1 descartado · 1 pendiente», sin las partes a cero.
+    private static string QuoteSummaryText(int total, int accepted, int dismissed, int pending)
     {
-        Models.TaskStatus.InProgress => "En curso",
-        Models.TaskStatus.Completed => "Completada",
-        _ => "Pendiente"
-    };
+        var parts = new List<string>();
+        if (accepted > 0)
+        {
+            parts.Add($"{accepted} {(accepted == 1 ? "aceptado" : "aceptados")}");
+        }
+        if (dismissed > 0)
+        {
+            parts.Add($"{dismissed} {(dismissed == 1 ? "descartado" : "descartados")}");
+        }
+        if (pending > 0)
+        {
+            parts.Add($"{pending} {(pending == 1 ? "pendiente" : "pendientes")}");
+        }
+        return parts.Count > 0 ? $"{total} — {string.Join(" · ", parts)}" : total.ToString();
+    }
+
+    /// <summary>
+    /// Cifra neta con el menos tipográfico «−» cuando es negativo, igual que
+    /// en Pedidos (specs/009 §4.2); lo usan los resúmenes anuales y la barra
+    /// de totales del formulario.
+    /// </summary>
+    internal static string FormatNet(decimal net) => net < 0
+        ? $"−{SpanishPrice.Format(-net)}"
+        : SpanishPrice.Format(net);
+
+    // Marca de cierre de año para las líneas de resumen: encabezan su bloque.
+    private static DateTime EndOfYear(int year) => new(year, 12, 31, 23, 59, 59);
+
+    // Cuenta una unidad más para un año del diccionario de resúmenes.
+    private static void CountByYear(Dictionary<int, int> counts, int year)
+    {
+        counts[year] = counts.GetValueOrDefault(year) + 1;
+    }
 }

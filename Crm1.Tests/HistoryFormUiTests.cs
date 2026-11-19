@@ -3,31 +3,41 @@ using Crm1.WindowsForms.Forms;
 using Crm1.WindowsForms.Models;
 using Xunit;
 using Task = Crm1.WindowsForms.Models.Task;
+using TaskStatus = Crm1.WindowsForms.Models.TaskStatus;
 
 namespace Crm1.Tests;
 
 /// <summary>
 /// Pruebas de interfaz del módulo de Historial (specs/010): la vista
 /// cronológica filtrada al registro con su aviso, contador y barra de
-/// totales; el futuro sin pedidos; la recarga al volver a mostrarse y el
-/// error visible con base ilegible.
+/// totales — detalle solo de lo que falta y resúmenes por año —; la recarga
+/// al volver a mostrarse y el error visible con base ilegible.
 /// </summary>
 [Collection("Formularios UI")]
 public sealed class HistoryFormUiTests
 {
     [Fact]
-    public void Client_history_shows_everything_newest_first_with_totals()
+    public void Client_history_shows_summaries_by_year_and_only_the_outstanding()
     {
         Client ana = Fixtures.Client("Ana", "12345678Z");
         UiTestEnvironment.WriteClients(ana);
 
-        Task task = Fixtures.Task(ana.Id);
-        task.Action = "Enviar correo";
-        task.DueDate = new DateTime(2026, 11, 10);
-        task.Description = "propuesta reformada";
+        Task pending = Fixtures.Task(ana.Id);
+        pending.Action = "Enviar correo";
+        pending.DueDate = new DateTime(2026, 11, 10);
+        pending.Description = "propuesta reformada";
 
-        Reminder reminder = Fixtures.Reminder(ana.Id);
-        reminder.RemindAt = new DateTime(2026, 11, 20, 10, 30, 0);
+        Task completed = Fixtures.Task(ana.Id);
+        completed.Action = "Llamar";
+        completed.DueDate = new DateTime(2026, 3, 5);
+        completed.Status = TaskStatus.Completed;
+
+        Reminder active = Fixtures.Reminder(ana.Id);
+        active.RemindAt = new DateTime(2026, 11, 20, 10, 30, 0);
+
+        Reminder dismissed = Fixtures.Reminder(ana.Id);
+        dismissed.RemindAt = new DateTime(2025, 5, 2, 9, 0, 0);
+        dismissed.Status = ReminderStatus.Dismissed;
 
         Quote quote = Fixtures.Quote(ana.Id, date: new DateTime(2026, 11, 12),
             amount: 1000m, reference: "PRE-003", description: "Reforma cocina",
@@ -39,8 +49,8 @@ public sealed class HistoryFormUiTests
             date: new DateTime(2026, 11, 20), amount: 150m, reference: "DEV-001",
             description: "");
 
-        UiTestEnvironment.WriteTasks(task);
-        UiTestEnvironment.WriteReminders(reminder);
+        UiTestEnvironment.WriteTasks(pending, completed);
+        UiTestEnvironment.WriteReminders(active, dismissed);
         UiTestEnvironment.WriteQuotes(quote);
         UiTestEnvironment.WriteOrders(order, creditNote);
 
@@ -51,24 +61,34 @@ public sealed class HistoryFormUiTests
             form.ShowHistoryOf(TaskRelatedType.Client, ana.Id, "Ana García Pérez");
             DataGridView grid = FormAccess.Grid(form, "historyDataGridView");
 
-            // Alta + recordatorio + abono + pedido + presupuesto + tarea.
-            Assert.Equal(6, grid.Rows.Count);
-            Assert.Equal("20/11/2026 10:30", FormAccess.CellText(grid.Rows[0], "dateColumn"));
-            Assert.Equal("Recordatorio", FormAccess.CellText(grid.Rows[0], "typeColumn"));
-            Assert.Equal("Abono", FormAccess.CellText(grid.Rows[1], "typeColumn"));
-            Assert.Equal("−150,00 € · DEV-001", FormAccess.CellText(grid.Rows[1], "detailColumn"));
-            Assert.Equal("Pedido", FormAccess.CellText(grid.Rows[2], "typeColumn"));
-            Assert.Equal("Presupuesto", FormAccess.CellText(grid.Rows[3], "typeColumn"));
-            Assert.Equal("1.000,00 € · PRE-003 · Reforma cocina", FormAccess.CellText(grid.Rows[3], "detailColumn"));
-            Assert.Equal("Aceptado", FormAccess.CellText(grid.Rows[3], "statusColumn"));
+            // Bloques por año con sus resúmenes y, entre medias, lo que falta.
+            Assert.Equal(7, grid.Rows.Count);
+            Assert.Equal("2026", FormAccess.CellText(grid.Rows[0], "dateColumn"));
+            Assert.Equal("Consumo 2026", FormAccess.CellText(grid.Rows[0], "typeColumn"));
+            Assert.Equal("1 pedido — 1.000,00 € · 1 abono — −150,00 € · Consumido: 850,00 €",
+                FormAccess.CellText(grid.Rows[0], "detailColumn"));
+            Assert.Equal("Presupuestos 2026", FormAccess.CellText(grid.Rows[1], "typeColumn"));
+            Assert.Equal("1 — 1 aceptado", FormAccess.CellText(grid.Rows[1], "detailColumn"));
+            Assert.Equal("Tareas 2026", FormAccess.CellText(grid.Rows[2], "typeColumn"));
+            Assert.Equal("1 completada", FormAccess.CellText(grid.Rows[2], "detailColumn"));
+
+            Assert.Equal("20/11/2026 10:30", FormAccess.CellText(grid.Rows[3], "dateColumn"));
+            Assert.Equal("Recordatorio", FormAccess.CellText(grid.Rows[3], "typeColumn"));
+            Assert.Equal("Activo", FormAccess.CellText(grid.Rows[3], "statusColumn"));
+            Assert.Equal("10/11/2026", FormAccess.CellText(grid.Rows[4], "dateColumn"));
             Assert.Equal("Tarea", FormAccess.CellText(grid.Rows[4], "typeColumn"));
             Assert.Equal("Enviar correo: propuesta reformada", FormAccess.CellText(grid.Rows[4], "detailColumn"));
-            Assert.Equal("Alta del cliente", FormAccess.CellText(grid.Rows[5], "typeColumn"));
+            Assert.Equal("Pendiente", FormAccess.CellText(grid.Rows[4], "statusColumn"));
+
             Assert.Equal("15/01/2026", FormAccess.CellText(grid.Rows[5], "dateColumn"));
+            Assert.Equal("Alta del cliente", FormAccess.CellText(grid.Rows[5], "typeColumn"));
+            Assert.Equal("2025", FormAccess.CellText(grid.Rows[6], "dateColumn"));
+            Assert.Equal("Recordatorios 2025", FormAccess.CellText(grid.Rows[6], "typeColumn"));
+            Assert.Equal("1 descartado", FormAccess.CellText(grid.Rows[6], "detailColumn"));
 
             Assert.Equal("Historial de: (Cliente) Ana García Pérez",
                 FormAccess.Label(form, "filterLabel").Text);
-            Assert.Equal("Mostrando 6 de 6", FormAccess.Label(form, "counterLabel").Text);
+            Assert.Equal("Mostrando 7 de 7", FormAccess.Label(form, "counterLabel").Text);
 
             string totals = FormAccess.Label(form, "totalsLabel").Text;
             Assert.Contains("1 pedido(s) — 1.000,00 €", totals);
@@ -84,10 +104,14 @@ public sealed class HistoryFormUiTests
         Contact clara = Fixtures.Contact("Clara");
         UiTestEnvironment.WriteContacts(clara);
 
-        Task task = Fixtures.Task(clara.Id, TaskRelatedType.Prospect);
-        task.DueDate = new DateTime(2026, 11, 10);
+        Task pending = Fixtures.Task(clara.Id, TaskRelatedType.Prospect);
+        pending.DueDate = new DateTime(2026, 11, 10);
 
-        UiTestEnvironment.WriteTasks(task);
+        Task completed = Fixtures.Task(clara.Id, TaskRelatedType.Prospect);
+        completed.DueDate = new DateTime(2026, 3, 2);
+        completed.Status = TaskStatus.Completed;
+
+        UiTestEnvironment.WriteTasks(pending, completed);
         UiTestEnvironment.WriteQuotes(
             Fixtures.Quote(clara.Id, TaskRelatedType.Prospect,
                 date: new DateTime(2026, 11, 12), status: QuoteStatus.Accepted),
@@ -101,10 +125,13 @@ public sealed class HistoryFormUiTests
             form.ShowHistoryOf(TaskRelatedType.Prospect, clara.Id, "Clara");
             DataGridView grid = FormAccess.Grid(form, "historyDataGridView");
 
-            // Sin fecha de alta en el futuro: presupuesto, presupuesto y tarea.
+            // Sin fecha de alta en el futuro: presupuestos, tareas y detalle.
             Assert.Equal(3, grid.Rows.Count);
-            Assert.Equal("Presupuesto", FormAccess.CellText(grid.Rows[0], "typeColumn"));
-            Assert.Equal("Presupuesto", FormAccess.CellText(grid.Rows[1], "typeColumn"));
+            Assert.Equal("2026", FormAccess.CellText(grid.Rows[0], "dateColumn"));
+            Assert.Equal("Presupuestos 2026", FormAccess.CellText(grid.Rows[0], "typeColumn"));
+            Assert.Equal("2 — 1 aceptado · 1 descartado", FormAccess.CellText(grid.Rows[0], "detailColumn"));
+            Assert.Equal("Tareas 2026", FormAccess.CellText(grid.Rows[1], "typeColumn"));
+            Assert.Equal("1 completada", FormAccess.CellText(grid.Rows[1], "detailColumn"));
             Assert.Equal("Tarea", FormAccess.CellText(grid.Rows[2], "typeColumn"));
 
             Assert.Equal("Historial de: (Futuro cliente) Clara",
@@ -122,7 +149,7 @@ public sealed class HistoryFormUiTests
     {
         Client ana = Fixtures.Client("Ana", "12345678Z");
         UiTestEnvironment.WriteClients(ana);
-        UiTestEnvironment.WriteTasks(Fixtures.Task(ana.Id));
+        UiTestEnvironment.WriteTasks(Fixtures.Task(ana.Id), Fixtures.Task(ana.Id, action: "Visitar"));
 
         WinFormsSta.Run(() =>
         {
@@ -134,19 +161,20 @@ public sealed class HistoryFormUiTests
             form.Prompt = new PromptRecorder().Answer;
             form.ShowHistoryOf(TaskRelatedType.Client, ana.Id, "Ana García Pérez");
             DataGridView grid = FormAccess.Grid(form, "historyDataGridView");
-            Assert.Equal(2, grid.Rows.Count); // alta + tarea
+            Assert.Equal(3, grid.Rows.Count); // alta + 2 tareas pendientes
 
             form.Show();
             form.Visible = false; // como al cambiar a otro módulo
 
             // Otro módulo guarda una tarea más en la base.
             UiTestEnvironment.WriteTasks(
-                Fixtures.Task(ana.Id), Fixtures.Task(ana.Id, action: "Visitar"));
+                Fixtures.Task(ana.Id), Fixtures.Task(ana.Id, action: "Visitar"),
+                Fixtures.Task(ana.Id, action: "Reunión"));
 
             form.Visible = true; // al volver, la tabla se recarga sola
 
-            Assert.Equal(3, grid.Rows.Count);
-            Assert.Equal("Mostrando 3 de 3", FormAccess.Label(form, "counterLabel").Text);
+            Assert.Equal(4, grid.Rows.Count);
+            Assert.Equal("Mostrando 4 de 4", FormAccess.Label(form, "counterLabel").Text);
         });
     }
 

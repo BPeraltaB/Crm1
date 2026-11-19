@@ -149,11 +149,18 @@ public partial class HistoryForm : System.Windows.Forms.Form
         _lastDatabaseStamp = GetDatabaseStamp();
     }
 
-    // Fecha de una línea: dd/MM/aaaa, y con hora en los recordatorios
-    // (specs/010 §3), cuya hora importa.
-    private static string FormatDate(HistoryEntry entry) => entry.Kind == HistoryEntryKind.Reminder
-        ? entry.Date.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)
-        : entry.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+    // Fecha de una línea: dd/MM/aaaa, con hora en los recordatorios
+    // (specs/010 §3), cuya hora importa; las de resumen anual se muestran
+    // solo con el año («2026») porque encabezan su bloque.
+    private static string FormatDate(HistoryEntry entry) => entry.Kind switch
+    {
+        HistoryEntryKind.ConsumptionSummary or HistoryEntryKind.QuoteSummary
+            or HistoryEntryKind.TaskSummary or HistoryEntryKind.ReminderSummary
+            => entry.Date.ToString("yyyy", CultureInfo.InvariantCulture),
+        HistoryEntryKind.Reminder
+            => entry.Date.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture),
+        _ => entry.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+    };
 
     /// <summary>
     /// Texto de la barra de totales (specs/010 §1): el dinero de pedidos y
@@ -164,17 +171,11 @@ public partial class HistoryForm : System.Windows.Forms.Form
         totals.OrderCount > 0 || totals.CreditNoteCount > 0
             ? $"{totals.OrderCount} pedido(s) — {SpanishPrice.Format(totals.OrderTotal)} € · " +
                 $"{totals.CreditNoteCount} abono(s) — −{SpanishPrice.Format(totals.CreditNoteTotal)} € · " +
-                $"Consumido: {NetText(totals.Consumed)} € · " +
+                $"Consumido: {HistoryService.FormatNet(totals.Consumed)} € · " +
                 $"Presupuestos: {totals.QuoteCount} — {totals.AcceptedQuotes} aceptado(s) · " +
                 $"{totals.DismissedQuotes} descartado(s) · {totals.PendingQuotes} pendiente(s)"
             : $"Presupuestos: {totals.QuoteCount} — {totals.AcceptedQuotes} aceptado(s) · " +
                 $"{totals.DismissedQuotes} descartado(s) · {totals.PendingQuotes} pendiente(s)";
-
-    // Neto con el menos tipográfico «−» cuando es negativo, igual que en
-    // Pedidos (specs/009 §4.2).
-    private static string NetText(decimal net) => net < 0
-        ? $"−{SpanishPrice.Format(-net)}"
-        : SpanishPrice.Format(net);
 
     /// <summary>
     /// Sello temporal de la base de datos: cambia cuando otro módulo la escribe.
