@@ -13,7 +13,10 @@ Formulario del módulo de clientes: tabla con todos los campos del cliente y bot
 ## 3. Diseño
 
 - Embebido en el área central de `MainForm`: se adapta al espacio disponible (`Dock = Fill`), sin borde ni título propio. El diseño de referencia es de 1200×650.
-- Panel superior (`buttonPanel`, 60 px, fondo #F3F4F6) con cuatro botones:
+- Panel superior (`buttonPanel`, 100 px, fondo #F3F4F6) con la botonera en **dos filas** (decisión del 19/11: en una sola, los botones del registro caían fuera de pantalla en ventanas normales — el área central mide ventana − 220 px de menú):
+
+  - **Fila 1 — gestión** (y=12): Nuevo, Modificar, Eliminar, Guardar y Cancelar (120×35 en 12, 144, 276, 408 y 540).
+  - **Fila 2 — registro marcado** (y=47): Tareas, Historial, Presupuestos y Pedidos (12, 144, 276 y 438; Presupuestos de 150 px).
 
 | Control (código)  | Texto     | Estado       |
 |-------------------|-----------|--------------|
@@ -26,6 +29,8 @@ Formulario del módulo de clientes: tabla con todos los campos del cliente y bot
 | `quotesButton`    | Presupuestos | Implementado (filtra specs/009 §7) |
 | `ordersButton`    | Pedidos   | Implementado (filtra specs/009 §7) |
 | `historyButton`   | Historial | Implementado (abre specs/010 §4) |
+
+- **Regresión de layout**: una prueba de interfaz recorre los botones de la botonera y comprueba que ninguno se solapa con otro y que todos caben en el ancho del área central con la ventana de `MainForm` al mínimo (900 px − 220 px = 680 px); cubre los bugs del 17/11 (solape Presupuestos/Convertir) y del 19/11 (Historial fuera de pantalla).
 
 - Barra de búsqueda (`filterPanel`, 40 px, fondo #F3F4F6) bajo la botonera: cuadro de texto `searchTextBox` con **búsqueda en vivo** (coincidencia parcial, sin mayúsculas ni tildes, en las 13 columnas) y contador `counterLabel` "Mostrando X de Y" según lo filtrado. Bloqueada durante la edición, igual que la botonera; si el cliente actual queda oculto, la marca se retira. Guardar conserva también las filas ocultas por la búsqueda. Sin desplegable de estado (decisión del 16/11: solo la caja).
 

@@ -43,10 +43,10 @@ Etiquetas de tipo, detalle y estado generadas en español (constitución, punto 
 
 ## 4. Integración
 
-- Botón **«Historial»** en la botonera de ClientForm y ContactForm (105×35, el último de la fila), con el mismo comportamiento que el botón Tareas: requiere registro actual marcado (sin selección → aviso «Selecciona un cliente/futuro cliente de la tabla.», caption «CRM1 — Historial»); inactivo durante la edición o con error de carga; lanza el evento `HistoryRequested(id, nombre)` que atiende MainForm.
+- Botón **«Historial»** en la segunda fila de la botonera de ClientForm y ContactForm —junto al botón Tareas (specs/002/003 §3)—, con el mismo comportamiento que este: requiere registro actual marcado (sin selección → aviso «Selecciona un cliente/futuro cliente de la tabla.», caption «CRM1 — Historial»); inactivo durante la edición o con error de carga; lanza el evento `HistoryRequested(id, nombre)` que atiende MainForm.
 - `MainForm.ShowFilteredHistory(relatedType, relatedId, displayName)`: crea `HistoryForm` una sola vez, aplica el filtro y lo muestra embebido en `panelContent` (como Tareas/Presupuestos/Pedidos filtrados).
 - **Sin** item de menú, **sin** «Ver todas/os», **sin** ampliación de la búsqueda global (specs/004) y **sin** doble clic de navegación (segunda ronda).
-- En ContactForm el arreglo aprovecha para **corregir un solapamiento existente**: el botón «Presupuestos» (x=802) pisaba al botón «Convertir en cliente» (x=795–945); pasa a x=957 y las posiciones de la botonera quedan sin solapes (Tareas 667 · Convertir 795 · Presupuestos 957 · Historial 1119).
+- El estreno del botón destapó los límites de la fila única de la botonera —el «Presupuestos» de ContactForm pisaba a «Convertir en cliente» desde el 17/11 y el propio «Historial», colocado al final, quedaba fuera de pantalla en ventanas normales— y llevó la botonera de ambos formularios a **dos filas** (gestión arriba, registro abajo), con la prueba de regresión de layout de specs/002 §3 que lo vigila desde entonces.
 
 ## 5. Pruebas
 

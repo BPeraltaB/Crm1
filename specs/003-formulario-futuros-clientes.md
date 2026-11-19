@@ -12,7 +12,7 @@ Formulario del módulo de futuros clientes: personas o empresas en seguimiento a
 
 ## 3. Diseño
 
-- Idéntico al de `ClientForm` (specs/002): panel superior con `newButton`/`modifyButton`/`deleteButton`/`saveButton`/`cancelButton` (Nuevo/Modificar/Eliminar/Guardar/Cancelar) y tabla `contactsDataGridView` con las mismas 13 columnas y en el mismo orden (Nombre, Primer apellido, Segundo apellido, Documento, Teléfono, Correo electrónico, Dirección, Código postal, Ciudad, Provincia, Estado, Fecha de alta, Observaciones).
+- Idéntico al de `ClientForm` (specs/002), incluida la **botonera en dos filas** (100 px): fila 1 de gestión (Nuevo/Modificar/Eliminar/Guardar/Cancelar en 12, 144, 276, 408 y 540) y fila 2 del registro marcado (y=47): Tareas, Historial, Presupuestos y Convertir en cliente (12, 144, 276 y 438; Presupuestos y Convertir de 150 px). Tabla `contactsDataGridView` con las mismas 13 columnas y en el mismo orden (Nombre, Primer apellido, Segundo apellido, Documento, Teléfono, Correo electrónico, Dirección, Código postal, Ciudad, Provincia, Estado, Fecha de alta, Observaciones).
 - Diferencias con Clientes:
   - Título "Futuros clientes".
   - La columna Estado es un desplegable con **Pendiente / Descartado** (en vez de Activo / Inactivo).
