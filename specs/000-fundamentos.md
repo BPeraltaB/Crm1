@@ -21,6 +21,7 @@ Primera versión funcional de CRM1 centrada en el módulo de Clientes: alta, edi
   - Área central clara (#F3F4F6) vacía, reservada para el contenido de los módulos futuros.
   - Barra de estado inferior blanca con "CRM1 — v0.1" y fecha/hora actualizada cada 30 segundos.
 - "Futuros clientes" es el módulo de seguimiento previo a ser cliente: `ContactForm`, especificado e implementado en specs/003-formulario-futuros-clientes.md. El módulo "Contactos" original (personas de contacto de cada cliente) queda por decidir; "Tareas" abre `TaskForm` (specs/005-tareas.md) y "Recordatorios" abre `ReminderForm` (specs/007-recordatorios.md); el resto de módulos del diseño general (oportunidades, etc.) se ubicarán en otro formulario en el futuro, no en este menú.
+- El **Historial** (specs/010-historial.md, implementado) es la excepción a la regla de «un módulo = un item de menú»: es una vista cronológica **por registro** (tareas, recordatorios, presupuestos y pedidos/abonos juntos) que solo se abre con el botón «Historial» de ClientForm o ContactForm; no tiene item propio ni entra en la búsqueda global.
 - `ClientForm` (`Crm1.WindowsForms/Forms/ClientForm.cs` + `Forms/ClientForm.Designer.cs`): formulario del módulo de clientes; su diseño y comportamiento se definen en specs/002-formulario-clientes.md.
 
 ## 3. Modelo de datos: Client
@@ -84,4 +85,4 @@ Todas las reglas viven fuera de los formularios (constitución, punto 3). El doc
 
 ## 8. Fuera de alcance (pendiente)
 
-Ampliación de la búsqueda global a los módulos que falten: contactos, oportunidades, presupuestos y pedidos (specs/009, módulo implementado), servicios, ventas, historial por cliente (tareas y recordatorios ya están, specs/004), formatos TXT y binario y exportación de datos.
+Ampliación de la búsqueda global a los módulos que falten: contactos, oportunidades, servicios y ventas (presupuestos y pedidos ya están, specs/004 y 009; el historial, specs/010, no entra a propósito: es una vista por registro, no un módulo navegable), formatos TXT y binario y exportación de datos.

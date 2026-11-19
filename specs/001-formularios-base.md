@@ -9,7 +9,7 @@ Crear formularios Windows Forms **en blanco**: sin lógica, sin controles y sin 
 ## 2. Proceso
 
 - Los formularios se crean **de uno en uno**, únicamente cuando el usuario lo pida.
-- El formulario principal `MainForm` **queda siempre intacto**: no se modifica ni se le añade código. Únicas excepciones, ya implementadas: "Clientes" muestra `ClientForm`, "Futuros clientes" muestra `ContactForm`, "Búsqueda" muestra `SearchForm`, "Tareas" muestra `TaskForm` (specs/005) y "Recordatorios" muestra `ReminderForm` (specs/007, implementado), embebidos en su área central (`panelContent`), según specs/000-fundamentos.md, specs/002, specs/003, specs/004, specs/005 y specs/007.
+- El formulario principal `MainForm` **queda siempre intacto**: no se modifica ni se le añade código. Únicas excepciones, ya implementadas: "Clientes" muestra `ClientForm`, "Futuros clientes" muestra `ContactForm`, "Búsqueda" muestra `SearchForm`, "Tareas" muestra `TaskForm` (specs/005), "Recordatorios" muestra `ReminderForm` (specs/007), "Presupuestos" muestra `QuoteForm` y "Pedidos" muestra `OrderForm` (specs/009), embebidos en su área central (`panelContent`), y `MainForm` también aloja embebido `HistoryForm` (specs/010) al pulsar el botón «Historial» de ClientForm/ContactForm — sin item de menú propio.
 - Ningún formulario nuevo se conecta al menú lateral de `MainForm`, salvo las excepciones anteriores.
 
 ## 3. Patrón de cada formulario
@@ -38,13 +38,13 @@ Crear formularios Windows Forms **en blanco**: sin lógica, sin controles y sin 
 | 9 | Pedidos                   | `OrderForm`       | Creado (specs/009) |
 | 10| Servicios                 | `ServiceForm`     | Pendiente          |
 | 11| Ventas                    | `SaleForm`        | Pendiente          |
-| 12| Historial                 | `HistoryForm`     | Pendiente          |
+| 12| Historial                 | `HistoryForm`     | Creado (specs/010) |
 
-Cada formulario se marcará como creado en esta tabla al entregarse; `ClientForm` está creado y diseñado según specs/002-formulario-clientes.md, `ContactForm` (Futuros clientes) según specs/003-formulario-futuros-clientes.md, `SearchForm` (Búsqueda) según specs/004-busqueda-global.md y `TaskForm` (Tareas) según specs/005-tareas.md (solo diseño, sin lógica ni eventos). `ReminderForm` (Recordatorios) nació en blanco según esta especificación y hoy está especificado e implementado en specs/007-recordatorios.md. `QuoteForm` (Presupuestos) y `OrderForm` (Pedidos) están especificados e implementados en specs/009-presupuestos-y-pedidos.md.
+Cada formulario se marcará como creado en esta tabla al entregarse; `ClientForm` está creado y diseñado según specs/002-formulario-clientes.md, `ContactForm` (Futuros clientes) según specs/003-formulario-futuros-clientes.md, `SearchForm` (Búsqueda) según specs/004-busqueda-global.md y `TaskForm` (Tareas) según specs/005-tareas.md (solo diseño, sin lógica ni eventos). `ReminderForm` (Recordatorios) nació en blanco según esta especificación y hoy está especificado e implementado en specs/007-recordatorios.md. `QuoteForm` (Presupuestos) y `OrderForm` (Pedidos) están especificados e implementados en specs/009-presupuestos-y-pedidos.md, y `HistoryForm` (Historial) en specs/010-historial.md — este último sin item de menú: solo se abre embebido y filtrado desde el botón «Historial» de ClientForm/ContactForm.
 
 ## 5. Fuera de alcance
 
 - Cualquier lógica, evento o acceso a datos dentro de los formularios.
-- Modificar `MainForm` o su menú (excepciones ya implementadas: "Clientes" muestra `ClientForm`, "Futuros clientes" muestra `ContactForm`, "Búsqueda" muestra `SearchForm`, "Tareas" muestra `TaskForm` y "Recordatorios" muestra `ReminderForm` (specs/007, implementado), embebidos en el área central).
+- Modificar `MainForm` o su menú (excepciones ya implementadas: "Clientes" muestra `ClientForm`, "Futuros clientes" muestra `ContactForm`, "Búsqueda" muestra `SearchForm`, "Tareas" muestra `TaskForm`, "Recordatorios" muestra `ReminderForm` (specs/007, implementado), "Presupuestos" `QuoteForm` y "Pedidos" `OrderForm` (specs/009), y `HistoryForm` embebido sin menú desde el botón «Historial» (specs/010), embebidos en el área central).
 - Conectar formularios entre sí (salvo la muestra embebida de `ClientForm` y `ContactForm` desde el menú, ya implementada).
 - Pruebas automatizadas (no hay lógica que probar; la constitución las exige para negocio y persistencia, que se especificarán aparte).
