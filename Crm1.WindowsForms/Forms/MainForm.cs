@@ -16,6 +16,7 @@ public partial class MainForm : System.Windows.Forms.Form
     private ReminderForm? reminderForm;
     private QuoteForm? quoteForm;
     private OrderForm? orderForm;
+    private HistoryForm? historyForm;
 
     public MainForm()
     {
@@ -35,8 +36,8 @@ public partial class MainForm : System.Windows.Forms.Form
     private void ClientsMenuItem_Click(object? sender, EventArgs e)
     {
         // Crea el formulario de clientes una sola vez y atiende sus botones
-        // Tareas, Presupuestos y Pedidos: abren el módulo correspondiente
-        // filtrado al cliente marcado.
+        // Tareas, Presupuestos, Pedidos e Historial: abren el módulo
+        // correspondiente filtrado al cliente marcado.
         if (clientForm is null)
         {
             clientForm = new ClientForm();
@@ -46,6 +47,8 @@ public partial class MainForm : System.Windows.Forms.Form
                 ShowFilteredQuotes(Crm1.WindowsForms.Models.TaskRelatedType.Client, id, name);
             clientForm.OrdersRequested += (id, name) =>
                 ShowFilteredOrders(id, name);
+            clientForm.HistoryRequested += (id, name) =>
+                ShowFilteredHistory(Crm1.WindowsForms.Models.TaskRelatedType.Client, id, name);
         }
 
         ShowModule(clientForm);
@@ -56,9 +59,10 @@ public partial class MainForm : System.Windows.Forms.Form
     /// </summary>
     private void ProspectsMenuItem_Click(object? sender, EventArgs e)
     {
-        // Crea el formulario una sola vez y atiende sus botones Tareas y
-        // Presupuestos: abren el módulo correspondiente filtrado al futuro
-        // cliente marcado (Pedidos no: un futuro con pedido ya sería cliente).
+        // Crea el formulario una sola vez y atiende sus botones Tareas,
+        // Presupuestos e Historial: abren el módulo correspondiente filtrado
+        // al futuro cliente marcado (Pedidos no: un futuro con pedido ya
+        // sería cliente).
         if (contactForm is null)
         {
             contactForm = new ContactForm();
@@ -66,6 +70,8 @@ public partial class MainForm : System.Windows.Forms.Form
                 ShowFilteredTasks(Crm1.WindowsForms.Models.TaskRelatedType.Prospect, id, name);
             contactForm.QuotesRequested += (id, name) =>
                 ShowFilteredQuotes(Crm1.WindowsForms.Models.TaskRelatedType.Prospect, id, name);
+            contactForm.HistoryRequested += (id, name) =>
+                ShowFilteredHistory(Crm1.WindowsForms.Models.TaskRelatedType.Prospect, id, name);
         }
 
         ShowModule(contactForm);
@@ -148,6 +154,18 @@ public partial class MainForm : System.Windows.Forms.Form
         orderForm ??= new OrderForm();
         orderForm.ShowOrdersOf(clientId, displayName);
         ShowModule(orderForm);
+    }
+
+    /// <summary>
+    /// Muestra el módulo de Historial del cliente o futuro cliente indicado
+    /// (botón Historial de ClientForm/ContactForm, specs/010 §4). Sin menú:
+    /// el historial solo se abre desde el registro marcado.
+    /// </summary>
+    private void ShowFilteredHistory(Crm1.WindowsForms.Models.TaskRelatedType relatedType, Guid relatedId, string displayName)
+    {
+        historyForm ??= new HistoryForm();
+        historyForm.ShowHistoryOf(relatedType, relatedId, displayName);
+        ShowModule(historyForm);
     }
 
     /// <summary>

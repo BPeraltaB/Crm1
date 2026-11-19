@@ -90,6 +90,14 @@ public partial class ContactForm : System.Windows.Forms.Form
     public event Action<Guid, string>? QuotesRequested;
 
     /// <summary>
+    /// Solicita abrir el módulo de Historial del futuro cliente marcado
+    /// (specs/010 §4): la vista cronológica con sus tareas, recordatorios y
+    /// presupuestos. Lo atiende MainForm. Pedidos no procede: un futuro
+    /// cliente con pedido ya sería cliente.
+    /// </summary>
+    public event Action<Guid, string>? HistoryRequested;
+
+    /// <summary>
     /// Diálogos del formulario (avisos, confirmaciones y errores): todo pasa
     /// por aquí. En la aplicación es un MessageBox con este formulario como
     /// dueño; las pruebas automatizadas de interfaz lo sustituyen por un
@@ -240,6 +248,7 @@ public partial class ContactForm : System.Windows.Forms.Form
         convertButton.Enabled = _canSave && !editing;
         tasksButton.Enabled = _canSave && !editing;
         quotesButton.Enabled = _canSave && !editing;
+        historyButton.Enabled = _canSave && !editing;
 
         // La caja de búsqueda también queda bloqueada mientras hay edición
         // (skill «modificar»: nada cambia la vista durante la edición).
@@ -659,6 +668,30 @@ public partial class ContactForm : System.Windows.Forms.Form
         }
 
         QuotesRequested?.Invoke(_currentContactId!.Value, RowDisplayName(row));
+    }
+
+    /// <summary>
+    /// Abre el módulo de Historial del futuro cliente marcado (specs/010 §4):
+    /// lanza el evento que atiende MainForm. Sin selección, aviso.
+    /// </summary>
+    private void HistoryButton_Click(object? sender, EventArgs e)
+    {
+        if (!_canSave || _activeRow is not null)
+        {
+            return;
+        }
+
+        System.Windows.Forms.DataGridViewRow? row = FindRowById(_currentContactId);
+        if (row is null)
+        {
+            Prompt(
+                "Selecciona un futuro cliente de la tabla.",
+                "CRM1 — Historial",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        HistoryRequested?.Invoke(_currentContactId!.Value, RowDisplayName(row));
     }
 
     /// <summary>

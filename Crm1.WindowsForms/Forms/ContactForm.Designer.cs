@@ -40,6 +40,7 @@ partial class ContactForm
         convertButton = new Button();
         tasksButton = new Button();
         quotesButton = new Button();
+        historyButton = new Button();
         filterPanel = new Panel();
         searchLabel = new Label();
         searchTextBox = new TextBox();
@@ -74,6 +75,7 @@ partial class ContactForm
         buttonPanel.Controls.Add(convertButton);
         buttonPanel.Controls.Add(tasksButton);
         buttonPanel.Controls.Add(quotesButton);
+        buttonPanel.Controls.Add(historyButton);
         buttonPanel.Dock = DockStyle.Top;
         buttonPanel.Location = new Point(0, 0);
         buttonPanel.Name = "buttonPanel";
@@ -153,13 +155,25 @@ partial class ContactForm
         //
         // quotesButton
         //
-        quotesButton.Location = new Point(802, 12);
+        // Corregido: estaba en x=802 y pisaba al botón «Convertir en cliente»
+        // (795–945); pasa a continuación de él (specs/010 §4).
+        quotesButton.Location = new Point(957, 12);
         quotesButton.Name = "quotesButton";
         quotesButton.Size = new Size(150, 35);
         quotesButton.TabIndex = 7;
         quotesButton.Text = "Presupuestos";
         quotesButton.UseVisualStyleBackColor = true;
         quotesButton.Click += QuotesButton_Click;
+        //
+        // historyButton
+        //
+        historyButton.Location = new Point(1119, 12);
+        historyButton.Name = "historyButton";
+        historyButton.Size = new Size(105, 35);
+        historyButton.TabIndex = 8;
+        historyButton.Text = "Historial";
+        historyButton.UseVisualStyleBackColor = true;
+        historyButton.Click += HistoryButton_Click;
         //
         // filterPanel
         //
@@ -337,6 +351,7 @@ partial class ContactForm
     private System.Windows.Forms.Button convertButton;
     private System.Windows.Forms.Button tasksButton;
     private System.Windows.Forms.Button quotesButton;
+    private System.Windows.Forms.Button historyButton;
     private System.Windows.Forms.Panel filterPanel;
     private System.Windows.Forms.Label searchLabel;
     private System.Windows.Forms.TextBox searchTextBox;

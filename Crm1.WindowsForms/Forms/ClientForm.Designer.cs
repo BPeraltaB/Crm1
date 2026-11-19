@@ -39,6 +39,7 @@ partial class ClientForm
         this.tasksButton = new System.Windows.Forms.Button();
         this.quotesButton = new System.Windows.Forms.Button();
         this.ordersButton = new System.Windows.Forms.Button();
+        this.historyButton = new System.Windows.Forms.Button();
         this.filterPanel = new System.Windows.Forms.Panel();
         this.searchLabel = new System.Windows.Forms.Label();
         this.searchTextBox = new System.Windows.Forms.TextBox();
@@ -72,6 +73,7 @@ partial class ClientForm
         this.buttonPanel.Controls.Add(this.tasksButton);
         this.buttonPanel.Controls.Add(this.quotesButton);
         this.buttonPanel.Controls.Add(this.ordersButton);
+        this.buttonPanel.Controls.Add(this.historyButton);
         this.buttonPanel.Dock = System.Windows.Forms.DockStyle.Top;
         this.buttonPanel.Location = new System.Drawing.Point(0, 0);
         this.buttonPanel.Name = "buttonPanel";
@@ -158,6 +160,16 @@ partial class ClientForm
         this.ordersButton.Text = "Pedidos";
         this.ordersButton.UseVisualStyleBackColor = true;
         this.ordersButton.Click += new System.EventHandler(this.OrdersButton_Click);
+        //
+        // historyButton
+        //
+        this.historyButton.Location = new System.Drawing.Point(1095, 12);
+        this.historyButton.Name = "historyButton";
+        this.historyButton.Size = new System.Drawing.Size(105, 35);
+        this.historyButton.TabIndex = 8;
+        this.historyButton.Text = "Historial";
+        this.historyButton.UseVisualStyleBackColor = true;
+        this.historyButton.Click += new System.EventHandler(this.HistoryButton_Click);
         //
         // filterPanel
         //
@@ -331,6 +343,7 @@ partial class ClientForm
     private System.Windows.Forms.Button tasksButton;
     private System.Windows.Forms.Button quotesButton;
     private System.Windows.Forms.Button ordersButton;
+    private System.Windows.Forms.Button historyButton;
     private System.Windows.Forms.Panel filterPanel;
     private System.Windows.Forms.Label searchLabel;
     private System.Windows.Forms.TextBox searchTextBox;

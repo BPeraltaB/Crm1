@@ -437,6 +437,57 @@ public sealed class ContactFormUiTests
         });
     }
 
+    // Pruebas del botón Historial (abre la vista cronológica, specs/010 §4).
+
+    [Fact]
+    public void History_button_without_selection_shows_a_notice()
+    {
+        UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
+        UiTestEnvironment.WriteContacts(Fixtures.Contact("Elena"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ContactForm();
+            var recorder = new PromptRecorder(DialogResult.OK);
+            form.Prompt = recorder.Answer;
+
+            FormAccess.Click(form, "HistoryButton_Click");
+
+            Assert.Single(recorder.Messages);
+            Assert.Contains("Selecciona un futuro cliente", recorder.Messages[0]);
+            Assert.Equal("CRM1 — Historial", recorder.Captions[0]);
+        });
+    }
+
+    [Fact]
+    public void History_button_with_a_marked_contact_raises_the_event()
+    {
+        Contact elena = Fixtures.Contact("Elena");
+        UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
+        UiTestEnvironment.WriteContacts(elena);
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ContactForm();
+            form.Prompt = new PromptRecorder().Answer;
+            DataGridView grid = FormAccess.Grid(form, "contactsDataGridView");
+            grid.CurrentCell = grid.Rows[0].Cells["firstNameColumn"];
+
+            Guid? requestedId = null;
+            string? requestedName = null;
+            form.HistoryRequested += (id, name) =>
+            {
+                requestedId = id;
+                requestedName = name;
+            };
+
+            FormAccess.Click(form, "HistoryButton_Click");
+
+            Assert.Equal(elena.Id, requestedId);
+            Assert.Equal("Elena", requestedName);
+        });
+    }
+
     // Pruebas de la caja de búsqueda del listado (specs/003 §6).
 
     [Fact]

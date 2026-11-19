@@ -96,6 +96,13 @@ public partial class ClientForm : System.Windows.Forms.Form
     /// </summary>
     public event Action<Guid, string>? OrdersRequested;
 
+    /// <summary>
+    /// Solicita abrir el módulo de Historial del cliente marcado (specs/010
+    /// §4): la vista cronológica con todas sus tareas, recordatorios,
+    /// presupuestos y pedidos. Lo atiende MainForm.
+    /// </summary>
+    public event Action<Guid, string>? HistoryRequested;
+
     // Cliente actual marcado por el usuario (skill «seleccionar-cliente»):
     // rastreo por identificador, nunca por índice.
     private Guid? _currentClientId;
@@ -217,6 +224,7 @@ public partial class ClientForm : System.Windows.Forms.Form
         tasksButton.Enabled = _canSave && !editing;
         quotesButton.Enabled = _canSave && !editing;
         ordersButton.Enabled = _canSave && !editing;
+        historyButton.Enabled = _canSave && !editing;
 
         // La caja de búsqueda también queda bloqueada mientras hay edición
         // (skill «modificar»: nada cambia la vista durante la edición).
@@ -654,6 +662,30 @@ public partial class ClientForm : System.Windows.Forms.Form
         }
 
         OrdersRequested?.Invoke(_currentClientId!.Value, RowDisplayName(row));
+    }
+
+    /// <summary>
+    /// Abre el módulo de Historial del cliente marcado (specs/010 §4): lanza
+    /// el evento que atiende MainForm. Sin selección, aviso.
+    /// </summary>
+    private void HistoryButton_Click(object? sender, EventArgs e)
+    {
+        if (!_canSave || _activeRow is not null)
+        {
+            return;
+        }
+
+        System.Windows.Forms.DataGridViewRow? row = FindRowById(_currentClientId);
+        if (row is null)
+        {
+            Prompt(
+                "Selecciona un cliente de la tabla.",
+                "CRM1 — Historial",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        HistoryRequested?.Invoke(_currentClientId!.Value, RowDisplayName(row));
     }
 
     /// <summary>
