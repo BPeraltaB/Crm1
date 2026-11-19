@@ -79,7 +79,7 @@ partial class ContactForm
         buttonPanel.Dock = DockStyle.Top;
         buttonPanel.Location = new Point(0, 0);
         buttonPanel.Name = "buttonPanel";
-        buttonPanel.Size = new Size(1200, 60);
+        buttonPanel.Size = new Size(1200, 100);
         buttonPanel.TabIndex = 0;
         // 
         // newButton
@@ -133,47 +133,46 @@ partial class ContactForm
         cancelButton.UseVisualStyleBackColor = true;
         cancelButton.Click += CancelButton_Click;
         // 
-        // convertButton
-        // 
-        convertButton.Location = new Point(795, 12);
-        convertButton.Name = "convertButton";
-        convertButton.Size = new Size(150, 35);
-        convertButton.TabIndex = 5;
-        convertButton.Text = "Convertir en cliente";
-        convertButton.UseVisualStyleBackColor = true;
-        convertButton.Click += ConvertButton_Click;
-        // 
         // tasksButton
+        // Segunda fila de la botonera: botones del registro marcado.
         // 
-        tasksButton.Location = new Point(667, 12);
+        tasksButton.Location = new Point(12, 47);
         tasksButton.Name = "tasksButton";
         tasksButton.Size = new Size(120, 35);
-        tasksButton.TabIndex = 6;
+        tasksButton.TabIndex = 5;
         tasksButton.Text = "Tareas";
         tasksButton.UseVisualStyleBackColor = true;
         tasksButton.Click += TasksButton_Click;
         //
+        // historyButton
+        //
+        historyButton.Location = new Point(144, 47);
+        historyButton.Name = "historyButton";
+        historyButton.Size = new Size(120, 35);
+        historyButton.TabIndex = 6;
+        historyButton.Text = "Historial";
+        historyButton.UseVisualStyleBackColor = true;
+        historyButton.Click += HistoryButton_Click;
+        //
         // quotesButton
         //
-        // Corregido: estaba en x=802 y pisaba al botón «Convertir en cliente»
-        // (795–945); pasa a continuación de él (specs/010 §4).
-        quotesButton.Location = new Point(957, 12);
+        quotesButton.Location = new Point(276, 47);
         quotesButton.Name = "quotesButton";
         quotesButton.Size = new Size(150, 35);
         quotesButton.TabIndex = 7;
         quotesButton.Text = "Presupuestos";
         quotesButton.UseVisualStyleBackColor = true;
         quotesButton.Click += QuotesButton_Click;
-        //
-        // historyButton
-        //
-        historyButton.Location = new Point(1119, 12);
-        historyButton.Name = "historyButton";
-        historyButton.Size = new Size(105, 35);
-        historyButton.TabIndex = 8;
-        historyButton.Text = "Historial";
-        historyButton.UseVisualStyleBackColor = true;
-        historyButton.Click += HistoryButton_Click;
+        // 
+        // convertButton
+        // 
+        convertButton.Location = new Point(438, 47);
+        convertButton.Name = "convertButton";
+        convertButton.Size = new Size(150, 35);
+        convertButton.TabIndex = 8;
+        convertButton.Text = "Convertir en cliente";
+        convertButton.UseVisualStyleBackColor = true;
+        convertButton.Click += ConvertButton_Click;
         //
         // filterPanel
         //
@@ -182,7 +181,7 @@ partial class ContactForm
         filterPanel.Controls.Add(searchTextBox);
         filterPanel.Controls.Add(counterLabel);
         filterPanel.Dock = DockStyle.Top;
-        filterPanel.Location = new Point(0, 60);
+        filterPanel.Location = new Point(0, 100);
         filterPanel.Name = "filterPanel";
         filterPanel.Size = new Size(1200, 40);
         filterPanel.TabIndex = 6;
@@ -228,7 +227,7 @@ partial class ContactForm
         dataGridViewCellStyle1.WrapMode = DataGridViewTriState.False;
         contactsDataGridView.DefaultCellStyle = dataGridViewCellStyle1;
         contactsDataGridView.Dock = DockStyle.Fill;
-        contactsDataGridView.Location = new Point(0, 100);
+        contactsDataGridView.Location = new Point(0, 140);
         contactsDataGridView.MultiSelect = false;
         contactsDataGridView.Name = "contactsDataGridView";
         contactsDataGridView.RowHeadersVisible = false;

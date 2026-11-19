@@ -77,7 +77,7 @@ partial class ClientForm
         this.buttonPanel.Dock = System.Windows.Forms.DockStyle.Top;
         this.buttonPanel.Location = new System.Drawing.Point(0, 0);
         this.buttonPanel.Name = "buttonPanel";
-        this.buttonPanel.Size = new System.Drawing.Size(1200, 60);
+        this.buttonPanel.Size = new System.Drawing.Size(1200, 100);
         this.buttonPanel.TabIndex = 0;
         //
         // newButton
@@ -132,8 +132,9 @@ partial class ClientForm
         this.cancelButton.Click += new System.EventHandler(this.CancelButton_Click);
         //
         // tasksButton
+        // Segunda fila de la botonera: botones del registro marcado.
         //
-        this.tasksButton.Location = new System.Drawing.Point(660, 12);
+        this.tasksButton.Location = new System.Drawing.Point(12, 47);
         this.tasksButton.Name = "tasksButton";
         this.tasksButton.Size = new System.Drawing.Size(120, 35);
         this.tasksButton.TabIndex = 5;
@@ -141,35 +142,35 @@ partial class ClientForm
         this.tasksButton.UseVisualStyleBackColor = true;
         this.tasksButton.Click += new System.EventHandler(this.TasksButton_Click);
         //
+        // historyButton
+        //
+        this.historyButton.Location = new System.Drawing.Point(144, 47);
+        this.historyButton.Name = "historyButton";
+        this.historyButton.Size = new System.Drawing.Size(120, 35);
+        this.historyButton.TabIndex = 6;
+        this.historyButton.Text = "Historial";
+        this.historyButton.UseVisualStyleBackColor = true;
+        this.historyButton.Click += new System.EventHandler(this.HistoryButton_Click);
+        //
         // quotesButton
         //
-        this.quotesButton.Location = new System.Drawing.Point(795, 12);
+        this.quotesButton.Location = new System.Drawing.Point(276, 47);
         this.quotesButton.Name = "quotesButton";
         this.quotesButton.Size = new System.Drawing.Size(150, 35);
-        this.quotesButton.TabIndex = 6;
+        this.quotesButton.TabIndex = 7;
         this.quotesButton.Text = "Presupuestos";
         this.quotesButton.UseVisualStyleBackColor = true;
         this.quotesButton.Click += new System.EventHandler(this.QuotesButton_Click);
         //
         // ordersButton
         //
-        this.ordersButton.Location = new System.Drawing.Point(960, 12);
+        this.ordersButton.Location = new System.Drawing.Point(438, 47);
         this.ordersButton.Name = "ordersButton";
         this.ordersButton.Size = new System.Drawing.Size(120, 35);
-        this.ordersButton.TabIndex = 7;
+        this.ordersButton.TabIndex = 8;
         this.ordersButton.Text = "Pedidos";
         this.ordersButton.UseVisualStyleBackColor = true;
         this.ordersButton.Click += new System.EventHandler(this.OrdersButton_Click);
-        //
-        // historyButton
-        //
-        this.historyButton.Location = new System.Drawing.Point(1095, 12);
-        this.historyButton.Name = "historyButton";
-        this.historyButton.Size = new System.Drawing.Size(105, 35);
-        this.historyButton.TabIndex = 8;
-        this.historyButton.Text = "Historial";
-        this.historyButton.UseVisualStyleBackColor = true;
-        this.historyButton.Click += new System.EventHandler(this.HistoryButton_Click);
         //
         // filterPanel
         //
@@ -178,7 +179,7 @@ partial class ClientForm
         this.filterPanel.Controls.Add(this.searchTextBox);
         this.filterPanel.Controls.Add(this.counterLabel);
         this.filterPanel.Dock = System.Windows.Forms.DockStyle.Top;
-        this.filterPanel.Location = new System.Drawing.Point(0, 60);
+        this.filterPanel.Location = new System.Drawing.Point(0, 100);
         this.filterPanel.Name = "filterPanel";
         this.filterPanel.Size = new System.Drawing.Size(1200, 40);
         this.filterPanel.TabIndex = 5;
@@ -229,7 +230,7 @@ partial class ClientForm
         this.registrationDateColumn,
         this.notesColumn});
         this.clientsDataGridView.Dock = System.Windows.Forms.DockStyle.Fill;
-        this.clientsDataGridView.Location = new System.Drawing.Point(0, 100);
+        this.clientsDataGridView.Location = new System.Drawing.Point(0, 140);
         this.clientsDataGridView.MultiSelect = false;
         this.clientsDataGridView.Name = "clientsDataGridView";
         this.clientsDataGridView.RowHeadersVisible = false;

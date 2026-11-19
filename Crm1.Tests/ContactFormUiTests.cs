@@ -488,6 +488,25 @@ public sealed class ContactFormUiTests
         });
     }
 
+    // Pruebas del layout de la botonera en dos filas (specs/003 §3): nada se
+    // solapa y todo cabe incluso con la ventana de MainForm al mínimo.
+
+    [Fact]
+    public void Button_panel_buttons_never_overlap_and_fit_the_minimum_width()
+    {
+        UiTestEnvironment.WriteClients(Fixtures.Client("Ana", "12345678Z"));
+        UiTestEnvironment.WriteContacts(Fixtures.Contact("Elena"));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new ContactForm();
+            form.Prompt = new PromptRecorder().Answer;
+
+            ButtonLayoutRules.AssertButtonsFitAndDoNotOverlap(
+                FormAccess.Panel(form, "buttonPanel"));
+        });
+    }
+
     // Pruebas de la caja de búsqueda del listado (specs/003 §6).
 
     [Fact]

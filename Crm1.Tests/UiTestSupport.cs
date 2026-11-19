@@ -1,6 +1,7 @@
 using System.Reflection;
 using Crm1.WindowsForms.Models;
 using Crm1.WindowsForms.Services;
+using Xunit;
 using Task = Crm1.WindowsForms.Models.Task;
 using TaskStatus = Crm1.WindowsForms.Models.TaskStatus;
 
@@ -178,6 +179,9 @@ internal static class FormAccess
     public static Button Button(object form, string fieldName) =>
         (Button)Field(form, fieldName).GetValue(form)!;
 
+    public static Panel Panel(object form, string fieldName) =>
+        (Panel)Field(form, fieldName).GetValue(form)!;
+
     public static Label Label(object form, string fieldName) =>
         (Label)Field(form, fieldName).GetValue(form)!;
 
@@ -205,6 +209,40 @@ internal static class FormAccess
         {
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException!).Throw();
             throw;
+        }
+    }
+}
+
+/// <summary>
+/// Reglas de layout compartidas por las pruebas de las botoneras: ningún
+/// botón se solapa con otro y todos caben en el ancho disponible (regresión
+/// de los bugs del 17/11 y 19/11: un botón pisando a otro y un botón fuera
+/// de pantalla en ventanas normales).
+/// </summary>
+internal static class ButtonLayoutRules
+{
+    // Ancho del área central con la ventana de MainForm al mínimo
+    // (900 px de ventana − 220 px de menú lateral).
+    public const int MinimumPanelWidth = 680;
+
+    public static void AssertButtonsFitAndDoNotOverlap(Panel panel)
+    {
+        Button[] buttons = panel.Controls.OfType<Button>().ToArray();
+        Assert.NotEmpty(buttons);
+
+        foreach (Button button in buttons)
+        {
+            Assert.True(button.Right <= MinimumPanelWidth,
+                $"{button.Name} se sale del ancho mínimo ({button.Right} > {MinimumPanelWidth}).");
+        }
+
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            for (int j = i + 1; j < buttons.Length; j++)
+            {
+                Assert.False(buttons[i].Bounds.IntersectsWith(buttons[j].Bounds),
+                    $"{buttons[i].Name} y {buttons[j].Name} se solapan.");
+            }
         }
     }
 }
