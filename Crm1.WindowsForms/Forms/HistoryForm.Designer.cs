@@ -115,6 +115,8 @@ partial class HistoryForm
         this.historyDataGridView.Size = new System.Drawing.Size(1200, 610);
         this.historyDataGridView.TabIndex = 1;
         this.historyDataGridView.RowPostPaint += new System.Windows.Forms.DataGridViewRowPostPaintEventHandler(this.HistoryDataGridView_RowPostPaint);
+        this.historyDataGridView.CellDoubleClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.HistoryDataGridView_CellDoubleClick);
+        this.historyDataGridView.KeyDown += new System.Windows.Forms.KeyEventHandler(this.HistoryDataGridView_KeyDown);
         this.historyDataGridView.DataError += new System.Windows.Forms.DataGridViewDataErrorEventHandler(this.HistoryDataGridView_DataError);
         //
         // dateColumn

@@ -9,7 +9,7 @@
 - **La línea más antigua es el «Alta del cliente»** (o «Alta del futuro cliente»): solo si el registro tiene fecha (en futuros es opcional; sin fecha no hay fila de alta).
 - **Barra de totales globales** (decisión del usuario): dinero de pedidos, dinero de abonos **y** el neto («Consumido»), más los presupuestos con aceptados, descartados y pendientes — de toda la historia; los desgloses por año viven en la tabla.
 - **Sin botón «Ver todas/os»** y **sin item propio en el menú lateral**: el historial siempre está filtrado a un registro concreto; se abre desde el botón «Historial» de ClientForm o ContactForm.
-- **Navegación con doble clic** al registro en su módulo (como la búsqueda global): **aplazada a una segunda ronda** (decisión del usuario).
+- **Navegación con doble clic** (o Enter) al registro en su módulo, **implementada** (segunda ronda, decisión del usuario 19/11): el «Alta» lleva al propio cliente o futuro en su módulo, y las líneas de tarea y recordatorio detalladas a su fila (`SelectTaskById`/`SelectReminderById`). Las líneas de **resumen anual** abren la vista del módulo **filtrada al registro** (`ShowTasksOf`/`ShowQuotesOf`/`ShowOrdersOf`); la de recordatorios descartados abre el módulo completo (Recordatorios no tiene vista por registro). Con una edición en curso en el módulo destino: aviso y no se navega.
 
 ## 2. Agregación (HistoryService, en Services/)
 
@@ -47,6 +47,7 @@ Etiquetas de tipo, detalle y estado generadas en español, con singular y plural
   - **Contador** «Mostrando X de X» en el extremo derecho (X = líneas de la tabla).
 - Tabla `historyDataGridView` con 4 columnas de texto: **Fecha · Tipo · Detalle · Estado**. La fecha se muestra `dd/MM/aaaa`, `dd/MM/aaaa HH:mm` en los recordatorios (su hora importa) y **solo el año** («2026») en las líneas de resumen anual. Ordenable por cabeceras (con la misma limitación asumida de siempre al ordenar fechas como texto).
 - **Carga**: `ShowHistoryOf(relatedType, relatedId, displayName)` fija el registro objetivo y rellena la tabla; el formulario se crea una sola vez y cada apertura reutiliza la instancia (patrón de TaskForm filtrado, pero sin botón «Ver todas»).
+- **Navegación (implementado, §1)**: doble clic o Enter sobre una línea lanza `NavigateRequested(tipo de línea, registro destino)` con el identificador guardado en cada fila (`TargetId`: tarea o recordatorio; nulo en el alta y en los resúmenes). `MainForm` atiende el evento sabiendo el registro objetivo del historial abierto y muestra el módulo correspondiente: fila concreta en Clientes/Futuros/Tareas/Recordatorios o vista filtrada del registro en Tareas/Presupuestos/Pedidos.
 - **Recarga por sello temporal** al volver a mostrarse (si `Data/crm1.db` cambió en disco), para reflejar lo guardado en otros módulos; base ilegible → error visible y tabla vacía (constitución, punto 5).
 
 ## 4. Integración
@@ -59,10 +60,9 @@ Etiquetas de tipo, detalle y estado generadas en español, con singular y plural
 ## 5. Pruebas
 
 - **HistoryServiceTests** (servicio puro): bloques anuales con su orden (consumo, presupuestos, tareas, recordatorios y detalle vivo entre medias); solo lo pendiente/activo se detalla y lo completado/descartado se resume; textos de los resúmenes (partes a cero omitidas, singular/plural, año de solo abonos sin «0 pedidos», neto negativo con «−»); tarea sin descripción y estados En curso/Pendiente; alta condicionada a la fecha (cliente siempre, futuro sin fecha no); futuro sin pedidos (ni líneas ni totales); la actividad de otros registros no aparece; totales globales con abono (consumido = neto, incluso negativo); registro sin actividad.
-- **HistoryFormUiTests** (formularios reales, colección «Formularios UI»): vista de un cliente con todo (resúmenes por año, detalle, fecha de año, aviso, contador y barra de totales); vista de un futuro (solo presupuestos); recarga al volver a mostrarse tras un cambio en disco; base ilegible → error y tabla vacía.
+- **HistoryFormUiTests** (formularios reales, colección «Formularios UI»): vista de un cliente con todo (resúmenes por año, detalle, fecha de año, aviso, contador y barra de totales); vista de un futuro (solo presupuestos); recarga al volver a mostrarse tras un cambio en disco; base ilegible → error y tabla vacía; doble clic pide navegar con el tipo de línea y el registro (identificador en las detalladas, nulo en el alta).
 - **Botón Historial** en ClientFormUiTests y ContactFormUiTests: sin selección → aviso; con registro marcado → evento con identificador y nombre.
 
-## 6. Fuera de alcance (segunda ronda)
+## 6. Fuera de alcance
 
-- Navegación con doble clic desde una línea del historial hasta su registro en el módulo correspondiente (reutilizar `SelectClientById`/`SelectTaskById`/`SelectQuoteById`/… de la búsqueda global).
 - Filtrado por fechas, exportación del historial y cualquier edición de las líneas.

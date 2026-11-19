@@ -203,4 +203,65 @@ public sealed class HistoryFormUiTests
             Assert.Contains("No se pudo leer la base de datos del historial", recorder.Messages[0]);
         });
     }
+
+    // Navegación con doble clic (specs/010 §6): la línea detallada lleva su
+    // registro y la de alta, el tipo sin identificador.
+    [Fact]
+    public void Double_click_requests_navigation_with_kind_and_target_id()
+    {
+        Client ana = Fixtures.Client("Ana", "12345678Z");
+        UiTestEnvironment.WriteClients(ana);
+
+        Reminder active = Fixtures.Reminder(ana.Id);
+        active.RemindAt = new DateTime(2026, 11, 20, 10, 30, 0);
+        UiTestEnvironment.WriteReminders(active);
+        UiTestEnvironment.WriteTasks(Fixtures.Task(ana.Id));
+
+        WinFormsSta.Run(() =>
+        {
+            using var form = new HistoryForm(null);
+            form.Prompt = new PromptRecorder().Answer;
+            form.ShowHistoryOf(TaskRelatedType.Client, ana.Id, "Ana García Pérez");
+            DataGridView grid = FormAccess.Grid(form, "historyDataGridView");
+
+            var navigations = new List<(Crm1.WindowsForms.Services.HistoryEntryKind Kind, Guid? TargetId)>();
+            form.NavigateRequested += (kind, targetId) => navigations.Add((kind, targetId));
+
+            System.Reflection.MethodInfo doubleClick = typeof(HistoryForm).GetMethod(
+                "HistoryDataGridView_CellDoubleClick",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+
+            // Línea de recordatorio detallado: pide su registro concreto.
+            doubleClick.Invoke(form, new object?[]
+            {
+                grid, new DataGridViewCellEventArgs(0, IndexOfRow(grid, "Recordatorio"))
+            });
+
+            // Línea de alta: solo el tipo (MainForm ya conoce al registro).
+            doubleClick.Invoke(form, new object?[]
+            {
+                grid, new DataGridViewCellEventArgs(0, IndexOfRow(grid, "Alta del cliente"))
+            });
+
+            Assert.Equal(2, navigations.Count);
+            Assert.Equal(Crm1.WindowsForms.Services.HistoryEntryKind.Reminder, navigations[0].Kind);
+            Assert.Equal(active.Id, navigations[0].TargetId);
+            Assert.Equal(Crm1.WindowsForms.Services.HistoryEntryKind.Registration, navigations[1].Kind);
+            Assert.Null(navigations[1].TargetId);
+        });
+    }
+
+    // Fila de la tabla con el texto de tipo indicado en la columna Tipo.
+    private static int IndexOfRow(DataGridView grid, string typeText)
+    {
+        for (int i = 0; i < grid.Rows.Count; i++)
+        {
+            if (FormAccess.CellText(grid.Rows[i], "typeColumn") == typeText)
+            {
+                return i;
+            }
+        }
+
+        throw new InvalidOperationException($"Fila no encontrada en el historial: {typeText}");
+    }
 }

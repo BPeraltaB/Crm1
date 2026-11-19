@@ -56,6 +56,14 @@ public sealed class HistoryEntry
 
     /// <summary>Texto de la columna Estado; vacío cuando el tipo no lo tiene.</summary>
     public string StatusText { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Identificador del registro al que navega la línea con doble clic
+    /// (specs/010 §6): el de la tarea o el recordatorio detallado. Nulo en el
+    /// alta (navega al propio registro, que el formulario ya conoce) y en las
+    /// líneas de resumen anual (abren el módulo filtrado al registro).
+    /// </summary>
+    public Guid? TargetId { get; init; }
 }
 
 /// <summary>
@@ -174,7 +182,8 @@ public static class HistoryService
                 Kind = HistoryEntryKind.Reminder,
                 TypeText = "Recordatorio",
                 Detail = reminder.Subject,
-                StatusText = "Activo"
+                StatusText = "Activo",
+                TargetId = reminder.Id
             });
         }
 
@@ -200,7 +209,8 @@ public static class HistoryService
                 Kind = HistoryEntryKind.Task,
                 TypeText = "Tarea",
                 Detail = task.Description.Length > 0 ? $"{task.Action}: {task.Description}" : task.Action,
-                StatusText = task.Status == Models.TaskStatus.InProgress ? "En curso" : "Pendiente"
+                StatusText = task.Status == Models.TaskStatus.InProgress ? "En curso" : "Pendiente",
+                TargetId = task.Id
             });
         }
 

@@ -42,6 +42,14 @@ public partial class HistoryForm : System.Windows.Forms.Form
     internal Func<string, string, MessageBoxButtons, MessageBoxIcon, DialogResult> Prompt { get; set; }
 
     /// <summary>
+    /// Se lanza al elegir una línea con doble clic o Enter (specs/010 §6)
+    /// para pedir a MainForm que muestre el módulo correspondiente: el
+    /// registro detallado (tarea, recordatorio o el alta) o la vista filtrada
+    /// del registro en las líneas de resumen anual.
+    /// </summary>
+    public event Action<HistoryEntryKind, Guid?>? NavigateRequested;
+
+    /// <summary>
     /// Crea el formulario vacío: la vista se fija con ShowHistoryOf al abrirlo
     /// desde el botón «Historial» de ClientForm o ContactForm (specs/010 §4).
     /// </summary>
@@ -135,11 +143,14 @@ public partial class HistoryForm : System.Windows.Forms.Form
         historyDataGridView.Rows.Clear();
         foreach (HistoryEntry entry in history.Entries)
         {
-            historyDataGridView.Rows.Add(
+            int index = historyDataGridView.Rows.Add(
                 FormatDate(entry),
                 entry.TypeText,
                 entry.Detail,
                 entry.StatusText);
+
+            // Para navegar con doble clic: el tipo de línea y su registro.
+            historyDataGridView.Rows[index].Tag = (entry.Kind, entry.TargetId);
         }
 
         // Sin fila marcada: aquí no hay «registro actual», solo lectura.
@@ -239,6 +250,43 @@ public partial class HistoryForm : System.Windows.Forms.Form
                 pen,
                 e.RowBounds.X + 1, e.RowBounds.Y + 1,
                 e.RowBounds.Width - 3, e.RowBounds.Height - 3);
+        }
+    }
+
+    /// <summary>
+    /// Pide navegar hasta el registro de la línea con doble clic (specs/010 §6).
+    /// </summary>
+    private void HistoryDataGridView_CellDoubleClick(object? sender, System.Windows.Forms.DataGridViewCellEventArgs e)
+    {
+        NavigateFromRow(e.RowIndex);
+    }
+
+    /// <summary>
+    /// Navega con Enter a la fila actual; la tecla se consume para que no
+    /// avance a la fila siguiente.
+    /// </summary>
+    private void HistoryDataGridView_KeyDown(object? sender, System.Windows.Forms.KeyEventArgs e)
+    {
+        if (e.KeyCode == System.Windows.Forms.Keys.Enter && historyDataGridView.CurrentCell is not null)
+        {
+            e.Handled = true;
+            NavigateFromRow(historyDataGridView.CurrentCell.RowIndex);
+        }
+    }
+
+    /// <summary>
+    /// Lanza la navegación de la línea indicada con su tipo y registro.
+    /// </summary>
+    private void NavigateFromRow(int rowIndex)
+    {
+        if (rowIndex < 0)
+        {
+            return;
+        }
+
+        if (historyDataGridView.Rows[rowIndex].Tag is ValueTuple<HistoryEntryKind, Guid?> target)
+        {
+            NavigateRequested?.Invoke(target.Item1, target.Item2);
         }
     }
 }

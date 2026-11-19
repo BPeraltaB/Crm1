@@ -90,9 +90,33 @@ public sealed class HistoryServiceTests
             activity.OfType<Quote>(),
             activity.OfType<Order>());
 
+    // Navegación con doble clic (specs/010 §6): las líneas detalladas llevan
+    // el identificador de su registro; el alta y los resúmenes no llevan.
     [Fact]
-    public void Client_history_details_only_what_is_outstanding_and_summarizes_by_year()
+    public void Detail_lines_expose_their_target_id_and_summaries_do_not()
     {
+        Client ana = ClientOf(new DateTime(2025, 1, 15));
+        Guid id = ana.Id;
+        Task task = TaskOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 10));
+        Reminder reminder = ReminderOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 20, 10, 30, 0));
+
+        HistoryResult history = Build(ana, null,
+            task,
+            reminder,
+            TaskOf(id, TaskRelatedType.Client, new DateTime(2026, 3, 5), status: TaskStatus.Completed),
+            QuoteOf(id, TaskRelatedType.Client, new DateTime(2026, 11, 12), status: QuoteStatus.Accepted),
+            OrderOf(id, new DateTime(2026, 11, 12), amount: 1000m));
+
+        Assert.Equal(task.Id, history.Entries.Single(entry => entry.Kind == HistoryEntryKind.Task).TargetId);
+        Assert.Equal(reminder.Id, history.Entries.Single(entry => entry.Kind == HistoryEntryKind.Reminder).TargetId);
+
+        Assert.All(
+            history.Entries.Where(entry => entry.Kind is not (HistoryEntryKind.Task or HistoryEntryKind.Reminder)),
+            entry => Assert.Null(entry.TargetId));
+    }
+
+    [Fact]
+    public void Client_history_details_only_what_is_outstanding_and_summarizes_by_year()    {
         Client ana = ClientOf(new DateTime(2025, 1, 15));
         Guid id = ana.Id;
 

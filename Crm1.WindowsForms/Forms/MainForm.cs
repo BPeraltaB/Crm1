@@ -159,13 +159,193 @@ public partial class MainForm : System.Windows.Forms.Form
     /// <summary>
     /// Muestra el módulo de Historial del cliente o futuro cliente indicado
     /// (botón Historial de ClientForm/ContactForm, specs/010 §4). Sin menú:
-    /// el historial solo se abre desde el registro marcado.
+    /// el historial solo se abre desde el registro marcado. También recuerda
+    /// el registro objetivo para la navegación con doble clic (§6).
     /// </summary>
     private void ShowFilteredHistory(Crm1.WindowsForms.Models.TaskRelatedType relatedType, Guid relatedId, string displayName)
     {
-        historyForm ??= new HistoryForm();
+        if (historyForm is null)
+        {
+            historyForm = new HistoryForm();
+            historyForm.NavigateRequested += HistoryForm_NavigateRequested;
+        }
+
+        _historyRelatedType = relatedType;
+        _historyRelatedId = relatedId;
+        _historyDisplayName = displayName;
         historyForm.ShowHistoryOf(relatedType, relatedId, displayName);
         ShowModule(historyForm);
+    }
+
+    // Registro objetivo del historial abierto: lo usa la navegación con doble
+    // clic para las vistas filtradas de las líneas de resumen (specs/010 §6).
+    private Crm1.WindowsForms.Models.TaskRelatedType _historyRelatedType;
+    private Guid _historyRelatedId;
+    private string _historyDisplayName = string.Empty;
+
+    /// <summary>
+    /// Navega desde una línea del historial hasta su registro o su módulo
+    /// (specs/010 §6): el alta lleva al propio cliente o futuro, las tareas y
+    /// recordatorios detallados a su fila, y las líneas de resumen anual a la
+    /// vista del módulo filtrada al registro (Recordatorios sin filtrar: no
+    /// tiene vista por registro). Con una edición en curso en el módulo
+    /// destino, avisa y no navega.
+    /// </summary>
+    private void HistoryForm_NavigateRequested(HistoryEntryKind kind, Guid? targetId)
+    {
+        switch (kind)
+        {
+            case HistoryEntryKind.Registration:
+                if (_historyRelatedType == Crm1.WindowsForms.Models.TaskRelatedType.Client)
+                {
+                    NavigateToClient(_historyRelatedId);
+                }
+                else
+                {
+                    NavigateToContact(_historyRelatedId);
+                }
+                break;
+
+            case HistoryEntryKind.Task:
+                NavigateToTask(targetId);
+                break;
+
+            case HistoryEntryKind.Reminder:
+                NavigateToReminder(targetId);
+                break;
+
+            case HistoryEntryKind.TaskSummary:
+                taskForm ??= new TaskForm();
+                if (WarnIfEditing(taskForm.IsEditing, "Tareas"))
+                {
+                    return;
+                }
+                taskForm.ShowTasksOf(_historyRelatedType, _historyRelatedId, _historyDisplayName);
+                ShowModule(taskForm);
+                break;
+
+            case HistoryEntryKind.ReminderSummary:
+                // Recordatorios no tiene vista por registro: se abre el
+                // módulo completo (recarga solo al mostrarse).
+                reminderForm ??= new ReminderForm();
+                if (WarnIfEditing(reminderForm.IsEditing, "Recordatorios"))
+                {
+                    return;
+                }
+                ShowModule(reminderForm);
+                break;
+
+            case HistoryEntryKind.QuoteSummary:
+                quoteForm ??= new QuoteForm();
+                if (WarnIfEditing(quoteForm.IsEditing, "Presupuestos"))
+                {
+                    return;
+                }
+                quoteForm.ShowQuotesOf(_historyRelatedType, _historyRelatedId, _historyDisplayName);
+                ShowModule(quoteForm);
+                break;
+
+            case HistoryEntryKind.ConsumptionSummary:
+                // Las líneas de consumo solo existen en clientes (specs/010).
+                orderForm ??= new OrderForm();
+                if (WarnIfEditing(orderForm.IsEditing, "Pedidos"))
+                {
+                    return;
+                }
+                orderForm.ShowOrdersOf(_historyRelatedId, _historyDisplayName);
+                ShowModule(orderForm);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Navega hasta el cliente indicado (línea de alta del historial).
+    /// </summary>
+    private void NavigateToClient(Guid clientId)
+    {
+        clientForm ??= new ClientForm();
+        if (WarnIfEditing(clientForm.IsEditing, "Clientes"))
+        {
+            return;
+        }
+
+        ShowModule(clientForm);
+        if (!clientForm.SelectClientById(clientId))
+        {
+            WarnNavigationBlocked("Clientes", "El registro no está en la tabla de Clientes; puede haber cambios sin guardar.");
+        }
+    }
+
+    /// <summary>
+    /// Navega hasta el futuro cliente indicado (línea de alta del historial).
+    /// </summary>
+    private void NavigateToContact(Guid contactId)
+    {
+        contactForm ??= new ContactForm();
+        if (WarnIfEditing(contactForm.IsEditing, "Futuros clientes"))
+        {
+            return;
+        }
+
+        ShowModule(contactForm);
+        if (!contactForm.SelectContactById(contactId))
+        {
+            WarnNavigationBlocked("Futuros clientes", "El registro no está en la tabla de Futuros clientes; puede haber cambios sin guardar.");
+        }
+    }
+
+    /// <summary>
+    /// Navega hasta la tarea de la línea del historial: primero se vuelve a
+    /// la vista completa por si estaba filtrada a otro registro.
+    /// </summary>
+    private void NavigateToTask(Guid? taskId)
+    {
+        taskForm ??= new TaskForm();
+        if (WarnIfEditing(taskForm.IsEditing, "Tareas"))
+        {
+            return;
+        }
+
+        taskForm.ShowAllTasks();
+        ShowModule(taskForm);
+        if (taskId is { } id && !taskForm.SelectTaskById(id))
+        {
+            WarnNavigationBlocked("Tareas", "La tarea no está en la tabla de Tareas; puede estar fuera de la vista o haber cambios sin guardar.");
+        }
+    }
+
+    /// <summary>
+    /// Navega hasta el recordatorio de la línea del historial.
+    /// </summary>
+    private void NavigateToReminder(Guid? reminderId)
+    {
+        reminderForm ??= new ReminderForm();
+        if (WarnIfEditing(reminderForm.IsEditing, "Recordatorios"))
+        {
+            return;
+        }
+
+        ShowModule(reminderForm);
+        if (reminderId is { } id && !reminderForm.SelectReminderById(id))
+        {
+            WarnNavigationBlocked("Recordatorios", "El recordatorio no está en la tabla de Recordatorios; puede haber cambios sin guardar.");
+        }
+    }
+
+    /// <summary>
+    /// Avisa de que el módulo destino tiene una edición en curso; devuelve
+    /// verdadero cuando la navegación debe detenerse.
+    /// </summary>
+    private bool WarnIfEditing(bool isEditing, string moduleName)
+    {
+        if (!isEditing)
+        {
+            return false;
+        }
+
+        WarnNavigationBlocked(moduleName,
+            $"Hay una edición en curso en {moduleName}.\n\nCancela o guarda los cambios antes de ir al registro del historial.");
+        return true;
     }
 
     /// <summary>
